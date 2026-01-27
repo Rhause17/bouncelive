@@ -3,22 +3,19 @@ import { useGame } from '../context/GameContext.jsx';
 
 const POWERUP_CONFIG = {
   T: {
-    title: 'Trajectory',
-    description: 'Extend trajectory preview to see further ahead.',
+    heading: 'Extend the ball trajectory.',
     actionType: 'USE_TRAJECTORY_POWERUP',
     countKey: 'trajectoryCount',
     usedKey: 'tUsedThisLevel',
   },
   R: {
-    title: 'Remove',
-    description: 'Select and remove one shape from the level.',
+    heading: 'Remove an object.',
     actionType: 'USE_REMOVE_POWERUP',
     countKey: 'removeCount',
     usedKey: 'rUsedThisLevel',
   },
   E: {
-    title: 'Expand',
-    description: 'Widen the basket by 30% for the rest of the run.',
+    heading: 'Widen the basket.',
     actionType: 'USE_WIDEN_POWERUP',
     countKey: 'widenCount',
     usedKey: 'eUsedThisLevel',
@@ -63,15 +60,13 @@ export default function PowerupPopover({ type, onClose, onEnterRemoveMode }) {
       <div className="popover-backdrop" onClick={onClose} />
       <div className="popover">
         <div className="popover-nub" />
-        <h3 className="popover-title">{config.title}</h3>
-        <p className="popover-desc">{config.description}</p>
-        <p className="popover-count">Remaining: {count}</p>
+        <h3 className="popover-title">{config.heading}</h3>
         <button
           className={`popover-btn ${isUsed ? 'disabled' : ''}`}
           onClick={handleUse}
           disabled={isUsed}
         >
-          {isUsed ? 'Used' : 'Use'}
+          Use
         </button>
       </div>
     </>

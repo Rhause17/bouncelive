@@ -686,17 +686,101 @@ function drawPowerupArea(ctx, w, h, state, T, L, powerupY) {
     Utils.roundRect(ctx, bx, btnY, btnSize, btnSize, L.boxCornerRadius);
     ctx.stroke();
 
-    // Letter
-    ctx.font = `700 ${16}px Nunito, sans-serif`;
-    ctx.fillStyle = btn.used ? T.textMuted : T.textPrimary;
+    // Draw icon
+    const isDisabled = btn.count <= 0;
+    const iconColor = isDisabled ? 'rgba(100, 116, 139, 0.5)' : T.textPrimary;
+    const centerX = bx + btnSize / 2;
+    const centerY = btnY + btnSize / 2;
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+
+    if (btn.label === 'T') {
+      // Trajectory icon: dotted arc + ball + arrowhead
+      ctx.strokeStyle = iconColor;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.arc(-8, 4, 14, -Math.PI * 0.8, -Math.PI * 0.15);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.beginPath();
+      ctx.arc(-8, -6, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = iconColor;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(8, 0);
+      ctx.lineTo(4, -3);
+      ctx.lineTo(4, 3);
+      ctx.closePath();
+      ctx.fill();
+    } else if (btn.label === 'R') {
+      // Hammer icon
+      ctx.fillStyle = iconColor;
+      ctx.strokeStyle = iconColor;
+      ctx.lineWidth = 2;
+
+      ctx.save();
+      ctx.rotate(-Math.PI / 4);
+      ctx.fillRect(-10, -5, 12, 10);
+      ctx.restore();
+
+      ctx.beginPath();
+      ctx.moveTo(-2, 2);
+      ctx.lineTo(8, 12);
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    } else if (btn.label === 'E') {
+      // Double-sided arrow icon
+      ctx.strokeStyle = iconColor;
+      ctx.fillStyle = iconColor;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+
+      ctx.beginPath();
+      ctx.moveTo(-10, 0);
+      ctx.lineTo(10, 0);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(-10, 0);
+      ctx.lineTo(-5, -5);
+      ctx.moveTo(-10, 0);
+      ctx.lineTo(-5, 5);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(10, 0);
+      ctx.lineTo(5, -5);
+      ctx.moveTo(10, 0);
+      ctx.lineTo(5, 5);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+
+    // Count badge (bottom-right corner)
+    const badgeX = bx + btnSize - 8;
+    const badgeY2 = btnY + btnSize - 8;
+    const badgeRadius = 8;
+
+    ctx.beginPath();
+    ctx.arc(badgeX, badgeY2, badgeRadius, 0, Math.PI * 2);
+    ctx.fillStyle = isDisabled ? 'rgba(100, 116, 139, 0.6)' : (
+      btn.label === 'T' ? T.secondary :
+      btn.label === 'R' ? (T.danger || '#F87171') :
+      T.secondary
+    );
+    ctx.fill();
+
+    ctx.font = '700 10px Nunito, sans-serif';
+    ctx.fillStyle = isDisabled ? 'rgba(255, 255, 255, 0.5)' : '#0F172A';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(btn.label, bx + btnSize / 2, btnY + btnSize / 2 - 4);
-
-    // Count
-    ctx.font = `600 ${10}px Nunito, sans-serif`;
-    ctx.fillStyle = T.textMuted;
-    ctx.fillText(`x${btn.count}`, bx + btnSize / 2, btnY + btnSize / 2 + 12);
+    ctx.fillText(btn.count.toString(), badgeX, badgeY2);
   });
 }
 

@@ -17,7 +17,9 @@ export function useGameLoop({ gameObjects, state, dispatch, onDraw }) {
   const lastTimeRef = useRef(0);
   const stateRef = useRef(state);
   const pausedRef = useRef(false);
+  const onDrawRef = useRef(onDraw);
   stateRef.current = state;
+  onDrawRef.current = onDraw;
 
   const loop = useCallback((timestamp) => {
     if (pausedRef.current) {
@@ -26,11 +28,11 @@ export function useGameLoop({ gameObjects, state, dispatch, onDraw }) {
       return;
     }
 
-    let dt = Math.min((timestamp - lastTimeRef.current) / 1000, 0.05);
+    let dt = (timestamp - lastTimeRef.current) / 1000;
     lastTimeRef.current = timestamp;
 
-    // After a pause, dt can be huge — clamp to a single frame
-    if (dt <= 0) dt = 1 / 60;
+    // Clamp dt to avoid physics spikes after pauses or tab switches
+    if (dt <= 0 || dt > 0.05) dt = 1 / 60;
 
     const s = stateRef.current;
     if (s.screen !== 'playing') {
@@ -182,10 +184,10 @@ export function useGameLoop({ gameObjects, state, dispatch, onDraw }) {
     }
 
     // Draw
-    onDraw(dt);
+    onDrawRef.current(dt);
 
     rafId.current = requestAnimationFrame(loop);
-  }, [gameObjects, dispatch, onDraw]);
+  }, [gameObjects, dispatch]);
 
   // Pause/resume RAF when overlays are shown (Safari optimization)
   useEffect(() => {

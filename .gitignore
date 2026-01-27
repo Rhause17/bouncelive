@@ -6,3 +6,4 @@ dist/
 .supabase/
 *.log
 .DS_Store
+.vercel
