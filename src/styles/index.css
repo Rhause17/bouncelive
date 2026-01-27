@@ -1,0 +1,378 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+}
+
+body {
+  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.app {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100dvh;
+  position: relative;
+}
+
+/* ========================================
+   WELCOME SCREEN
+   ======================================== */
+
+.welcome-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+}
+
+.welcome-content {
+  text-align: center;
+  padding: 2rem;
+}
+
+.welcome-title {
+  font-size: 3rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, #22d3ee, #a78bfa, #fbbf24);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.25rem;
+  letter-spacing: -0.02em;
+}
+
+.welcome-subtitle {
+  font-size: 1rem;
+  color: #94a3b8;
+  margin-bottom: 2.5rem;
+}
+
+.highest-reached {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding: 1rem 1.5rem;
+  background: rgba(51, 65, 85, 0.5);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.highest-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.highest-value {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #22d3ee;
+}
+
+.start-btn {
+  padding: 1rem 3rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: #0f172a;
+  background: linear-gradient(135deg, #a3e635, #65a30d);
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 20px rgba(163, 230, 53, 0.4);
+}
+
+.start-btn:active {
+  transform: scale(0.96);
+}
+
+.welcome-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.welcome-link {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0.375rem 0.75rem;
+}
+
+.welcome-link:active {
+  color: #22d3ee;
+}
+
+/* ========================================
+   LEADERBOARD
+   ======================================== */
+
+.leaderboard-content {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.leaderboard-title {
+  color: #fbbf24;
+  margin-bottom: 1rem;
+}
+
+.leaderboard-loading,
+.leaderboard-empty {
+  color: #64748b;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-bottom: 1.25rem;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+}
+
+.lb-rank {
+  width: 1.5rem;
+  font-weight: 800;
+  color: #64748b;
+}
+
+.lb-name {
+  flex: 1;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-level {
+  color: #22d3ee;
+  font-weight: 700;
+}
+
+.lb-stars {
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+/* ========================================
+   WIN/FAIL OVERLAY
+   ======================================== */
+
+.game-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.game-overlay.active {
+  display: flex;
+}
+
+.overlay-content {
+  text-align: center;
+  padding: 2rem;
+  background: rgba(51, 65, 85, 0.95);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 260px;
+}
+
+.overlay-text {
+  font-size: 2rem;
+  font-weight: 900;
+  margin-bottom: 0.25rem;
+}
+
+.win .overlay-text {
+  color: #4ade80;
+}
+
+.level-complete-text {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  margin-bottom: 1.25rem;
+}
+
+.stars {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.star {
+  font-size: 2rem;
+  color: #334155;
+  transition: color 0.3s;
+}
+
+.star.filled {
+  color: #fbbf24;
+}
+
+.next-level-btn {
+  padding: 0.875rem 2.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: #0f172a;
+  background: linear-gradient(135deg, #a3e635, #65a30d);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(163, 230, 53, 0.3);
+}
+
+.next-level-btn:active {
+  transform: scale(0.96);
+}
+
+/* ========================================
+   POWERUP POPOVER
+   ======================================== */
+
+.popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.popover {
+  position: fixed;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 31;
+  background: rgba(51, 65, 85, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  min-width: 220px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.popover-nub {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 16px;
+  height: 16px;
+  background: rgba(51, 65, 85, 0.97);
+  border-right: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.popover-title {
+  font-size: 1.125rem;
+  font-weight: 800;
+  margin-bottom: 0.25rem;
+}
+
+.popover-desc {
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.popover-count {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 0.75rem;
+}
+
+.popover-btn {
+  padding: 0.625rem 2rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  font-family: inherit;
+  color: #0f172a;
+  background: linear-gradient(135deg, #a3e635, #65a30d);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(163, 230, 53, 0.3);
+}
+
+.popover-btn:active {
+  transform: scale(0.96);
+}
+
+.popover-btn.disabled {
+  background: #334155;
+  color: #64748b;
+  box-shadow: none;
+  cursor: default;
+}
+
+/* ========================================
+   SAFARI PERFORMANCE
+   No backdrop-filter anywhere (prevents
+   GPU compositor stall over canvas).
+   Disable expensive effects on overlays.
+   ======================================== */
+
+@supports (-webkit-touch-callout: none) {
+  .game-overlay,
+  .overlay-content,
+  .popover,
+  .popover-backdrop {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    filter: none !important;
+  }
+
+  .next-level-btn,
+  .start-btn,
+  .popover-btn {
+    box-shadow: none !important;
+    transition: none !important;
+  }
+
+  .star {
+    transition: none !important;
+  }
+}

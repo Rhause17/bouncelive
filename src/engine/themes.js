@@ -1,0 +1,148 @@
+// ========================================
+// THEME / SKIN SYSTEM
+// ========================================
+
+export const SKINS = {
+  arcadeDark: {
+    name: 'Arcade Dark',
+    primary: '#22D3EE',
+    primaryLight: '#67E8F9',
+    primaryDark: '#0891B2',
+    secondary: '#22D3EE',
+    secondaryLight: '#67E8F9',
+    accent: '#FBBF24',
+    accentLight: '#FCD34D',
+    danger: '#F87171',
+    dangerLight: '#FCA5A5',
+    success: '#4ADE80',
+    ink: '#0F172A',
+
+    bgGradientStart: '#3D4A5F',
+    bgGradientMid: '#475569',
+    bgGradientEnd: '#3D4A5F',
+    bgPattern: 'rgba(99, 102, 241, 0.025)',
+
+    panelTopStart: 'rgba(51, 65, 85, 0.92)',
+    panelTopEnd: 'rgba(51, 65, 85, 0.85)',
+    panelTopStroke: 'rgba(255, 255, 255, 0.12)',
+    panelBottomStart: 'rgba(51, 65, 85, 0.92)',
+    panelBottomEnd: 'rgba(51, 65, 85, 0.85)',
+    panelBottomStroke: 'rgba(255, 255, 255, 0.12)',
+    panelPowerupStart: 'rgba(51, 65, 85, 0.94)',
+    panelPowerupEnd: 'rgba(51, 65, 85, 0.88)',
+
+    movesPillStart: 'rgba(51, 65, 85, 0.95)',
+    movesPillEnd: 'rgba(51, 65, 85, 0.9)',
+    movesPillStroke: 'rgba(255, 255, 255, 0.18)',
+    specsPillStart: 'rgba(51, 65, 85, 0.95)',
+    specsPillEnd: 'rgba(51, 65, 85, 0.9)',
+    specsPillStroke: 'rgba(255, 255, 255, 0.18)',
+
+    movesGoodStart: 'rgba(34, 197, 94, 0.3)',
+    movesGoodEnd: 'rgba(34, 197, 94, 0.2)',
+    movesGoodText: '#4ADE80',
+    movesGoodGlow: 'rgba(34, 197, 94, 0.5)',
+    movesWarnStart: 'rgba(251, 191, 36, 0.3)',
+    movesWarnEnd: 'rgba(251, 191, 36, 0.2)',
+    movesWarnText: '#FBBF24',
+    movesWarnGlow: 'rgba(251, 191, 36, 0.5)',
+    movesLowStart: 'rgba(248, 113, 113, 0.35)',
+    movesLowEnd: 'rgba(248, 113, 113, 0.25)',
+    movesLowText: '#F87171',
+    movesLowGlow: 'rgba(248, 113, 113, 0.6)',
+
+    submitStart: '#A3E635',
+    submitEnd: '#65A30D',
+    submitGlow: 'rgba(163, 230, 53, 0.6)',
+    submitDisabledStart: 'rgba(100, 116, 139, 0.7)',
+    submitDisabledEnd: 'rgba(100, 116, 139, 0.5)',
+
+    angleChipStart: 'rgba(71, 85, 105, 0.9)',
+    angleChipEnd: 'rgba(71, 85, 105, 0.8)',
+    angleChipStroke: 'rgba(255, 255, 255, 0.15)',
+    angleChipActiveStart: 'rgba(34, 211, 238, 0.25)',
+    angleChipActiveEnd: 'rgba(34, 211, 238, 0.15)',
+    angleChipActiveStroke: '#22D3EE',
+    angleChipActiveText: '#22D3EE',
+
+    powerup1Start: 'rgba(34, 211, 238, 0.18)',
+    powerup1End: 'rgba(34, 211, 238, 0.1)',
+    powerup1Stroke: 'rgba(34, 211, 238, 0.4)',
+    powerup2Start: 'rgba(251, 113, 133, 0.18)',
+    powerup2End: 'rgba(251, 113, 133, 0.1)',
+    powerup2Stroke: 'rgba(251, 113, 133, 0.4)',
+    powerup3Start: 'rgba(251, 191, 36, 0.18)',
+    powerup3End: 'rgba(251, 191, 36, 0.1)',
+    powerup3Stroke: 'rgba(251, 191, 36, 0.4)',
+
+    ballFillStart: '#FDE68A',
+    ballFillEnd: '#FBBF24',
+    ballStroke: '#F59E0B',
+
+    basketFill: 'rgba(74, 222, 128, 0.18)',
+    basketStroke: '#4ADE80',
+    basketRim: '#22C55E',
+    basketLid: '#F87171',
+    basketLidGlow: 'rgba(248, 113, 113, 0.5)',
+
+    shapeNeutralFill: 'rgba(148, 163, 184, 0.25)',
+    shapeNeutralStroke: 'rgba(203, 213, 225, 0.8)',
+    shapeNeutralGlow: 'rgba(203, 213, 225, 0.3)',
+
+    shapeSelectedAccent: '#22D3EE',
+    shapeSelectedFill: 'rgba(34, 211, 238, 0.25)',
+    shapeSelectedStroke: '#67E8F9',
+    shapeSelectedGlow: 'rgba(34, 211, 238, 0.6)',
+
+    spawnLine: 'rgba(203, 213, 225, 0.35)',
+    basketLine: 'rgba(74, 222, 128, 0.4)',
+    pieceAreaStroke: 'rgba(203, 213, 225, 0.3)',
+
+    trajectoryStart: 'rgba(34, 211, 238, 0.6)',
+    trajectoryEnd: 'rgba(34, 211, 238, 0.1)',
+    trajectoryTick: 'rgba(34, 211, 238, 0.5)',
+    trajectoryImpact: '#FBBF24',
+    trajectoryImpactGlow: 'rgba(251, 191, 36, 0.5)',
+
+    trailColor: '#FBBF24',
+    trailColorFast: '#F87171',
+    trailGlow: 'rgba(251, 191, 36, 0.6)',
+    particleColors: ['#FBBF24', '#F87171', '#22D3EE', '#4ADE80', '#FFFFFF'],
+    confettiColors: ['#22D3EE', '#FBBF24', '#4ADE80', '#F87171', '#67E8F9', '#FCD34D'],
+    shapeHitHighlight: '#FBBF24',
+    swooshColor: 'rgba(34, 211, 238, 0.5)',
+
+    textPrimary: '#F1F5F9',
+    textSecondary: '#CBD5E1',
+    textMuted: '#94A3B8',
+    textLight: '#64748B',
+    textOnPrimary: '#FFFFFF',
+  },
+};
+
+export function getTheme(skinName = 'arcadeDark') {
+  const SKIN = SKINS[skinName] || SKINS.arcadeDark;
+  return {
+    ...SKIN,
+    oneWayHighlight: '#FF6B9D',
+    oneWayGlow: 'rgba(255, 107, 157, 0.6)',
+    glassBackground: 'rgba(30, 41, 59, 0.85)',
+    glassBorder: 'rgba(255, 255, 255, 0.1)',
+    glassBackgroundSolid: 'rgba(51, 65, 85, 0.95)',
+    shadowSoft: 'rgba(0, 0, 0, 0.25)',
+    shadowMedium: 'rgba(0, 0, 0, 0.35)',
+    shadowGlow: SKIN.submitGlow,
+    shadowSuccess: SKIN.submitGlow,
+    buttonDisabled: SKIN.submitDisabledStart,
+    buttonDisabledText: SKIN.textMuted,
+    successLight: SKIN.success,
+    success: SKIN.success,
+    shapeStroke: SKIN.shapeNeutralStroke || 'rgba(148, 163, 184, 0.9)',
+    shapeFill: SKIN.shapeNeutralFill || 'rgba(100, 116, 139, 0.35)',
+    shapeGlow: SKIN.shapeNeutralGlow || 'rgba(148, 163, 184, 0.4)',
+    shapeSelected: SKIN.shapeSelectedStroke || SKIN.secondary,
+    shapeSelectedFill: SKIN.shapeSelectedFill || 'rgba(34, 211, 238, 0.2)',
+    shapeSelectedGlow: SKIN.shapeSelectedGlow || 'rgba(34, 211, 238, 0.6)',
+    shapeSelectedAccent: SKIN.shapeSelectedAccent || SKIN.secondary,
+  };
+}

@@ -1,0 +1,12 @@
+export { Shape } from './Shape.js';
+export { PolygonShape } from './PolygonShape.js';
+export { Triangle } from './Triangle.js';
+export { LineSegment } from './LineSegment.js';
+export { HalfCircle } from './HalfCircle.js';
+export { Diamond } from './Diamond.js';
+export { Octagon } from './Octagon.js';
+export { Trapezoid } from './Trapezoid.js';
+export { Arrowhead } from './Arrowhead.js';
+export { Boomerang } from './Boomerang.js';
+export { HalfPipe } from './HalfPipe.js';
+export { SawtoothRamp } from './SawtoothRamp.js';
