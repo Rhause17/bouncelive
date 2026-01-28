@@ -205,13 +205,51 @@ export default function GameCanvas() {
 
     // ===== REMOVE MODE OVERLAY =====
     if (state.selectRemoveTargetMode) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-      ctx.fillRect(0, 0, w, h);
-      ctx.font = `700 ${18 * SIZE_SCALE}px Nunito, sans-serif`;
+      // Dark tint over everything except powerup area
+      const powerupTop = h - LAYOUT.powerupAreaHeight;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+      ctx.fillRect(0, 0, w, powerupTop);
+
+      // Re-draw shapes above tint with pulsing red glow
+      const glowPulse = 0.6 + 0.3 * Math.sin(go.time * 4);
+
+      go.shapes.forEach(s => {
+        if (!s.isVisible()) return;
+
+        ctx.save();
+        ctx.globalAlpha = s.opacity != null ? s.opacity : 1;
+
+        // Pulsing red glow
+        ctx.shadowColor = `rgba(248, 113, 113, ${glowPulse})`;
+        ctx.shadowBlur = 18 + 6 * Math.sin(go.time * 4);
+
+        // Draw shape segments with neutral fill + red stroke
+        const segs = s.getSegments();
+        if (segs.length > 0) {
+          ctx.beginPath();
+          ctx.moveTo(segs[0].a.x, segs[0].a.y);
+          for (const seg of segs) {
+            ctx.lineTo(seg.a.x, seg.a.y);
+            ctx.lineTo(seg.b.x, seg.b.y);
+          }
+          ctx.closePath();
+          ctx.fillStyle = 'rgba(148, 163, 184, 0.35)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(248, 113, 113, 0.95)';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+        }
+
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      });
+
+      // Hint text
+      ctx.font = `700 ${16 * SIZE_SCALE}px Nunito, sans-serif`;
       ctx.fillStyle = '#f87171';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('Tap a shape to remove it', w / 2, 60);
+      ctx.fillText('Tap an object to remove', w / 2, powerupTop - 30);
     }
 
     // ===== BOTTOM CONTROLS =====
