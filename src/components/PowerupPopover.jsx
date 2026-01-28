@@ -9,6 +9,7 @@ const POWERUP_CONFIG = {
     countKey: 'trajectoryCount',
     usedKey: 'tUsedThisLevel',
     buttonIndex: 0,
+    btnClass: 'popover-btn-t',
   },
   R: {
     heading: 'Remove an object.',
@@ -16,6 +17,7 @@ const POWERUP_CONFIG = {
     countKey: 'removeCount',
     usedKey: 'rUsedThisLevel',
     buttonIndex: 1,
+    btnClass: 'popover-btn-r',
   },
   E: {
     heading: 'Widen the basket.',
@@ -23,6 +25,7 @@ const POWERUP_CONFIG = {
     countKey: 'widenCount',
     usedKey: 'eUsedThisLevel',
     buttonIndex: 2,
+    btnClass: 'popover-btn-e',
   },
 };
 
@@ -30,16 +33,13 @@ export default function PowerupPopover({ type, onClose, onEnterRemoveMode }) {
   const { state, dispatch, gameObjects } = useGame();
   const popoverRef = useRef(null);
 
-  if (!type) return null;
-
   const config = POWERUP_CONFIG[type];
-  if (!config) return null;
 
-  const isUsed = state[config.usedKey];
-  const count = state[config.countKey];
+  const isUsed = config ? state[config.usedKey] : false;
+  const count = config ? state[config.countKey] : 0;
 
   const handleUse = () => {
-    if (isUsed || count <= 0) return;
+    if (!config || isUsed || count <= 0) return;
 
     dispatch({ type: config.actionType });
 
@@ -63,9 +63,8 @@ export default function PowerupPopover({ type, onClose, onEnterRemoveMode }) {
   // Position popover above the clicked powerup button
   useEffect(() => {
     const popover = popoverRef.current;
-    if (!popover) return;
+    if (!popover || !config) return;
 
-    // Find the canvas element to compute button positions
     const canvas = document.querySelector('canvas');
     if (!canvas) return;
 
@@ -79,18 +78,14 @@ export default function PowerupPopover({ type, onClose, onEnterRemoveMode }) {
     const spacing = (w - btnSize * 3) / 4;
     const btnIdx = config.buttonIndex;
 
-    // Button center X in canvas coordinates
+    // Button center X in canvas coordinates, converted to container-relative pixels
     const bx = spacing + btnIdx * (btnSize + spacing);
     const buttonCenterX = (bx + btnSize / 2) * scaleX + (canvasRect.left - containerRect.left);
-
-    // Position popover bottom edge 10px above the powerup area
-    const powerupAreaTop = canvasRect.bottom - L.powerupAreaHeight * scaleX;
-    const popoverBottom = containerRect.bottom - powerupAreaTop + 10;
 
     const popoverRect = popover.getBoundingClientRect();
     const popoverWidth = popoverRect.width;
 
-    // Center popover on button, clamped to container
+    // Center popover on button, clamped to container edges
     const margin = 12;
     let popoverLeft = buttonCenterX - popoverWidth / 2;
     popoverLeft = Math.max(margin, Math.min(popoverLeft, containerRect.width - popoverWidth - margin));
@@ -99,24 +94,25 @@ export default function PowerupPopover({ type, onClose, onEnterRemoveMode }) {
     let nubX = buttonCenterX - popoverLeft;
     nubX = Math.max(18, Math.min(nubX, popoverWidth - 18));
 
-    popover.style.bottom = popoverBottom + 'px';
     popover.style.left = popoverLeft + 'px';
     popover.style.setProperty('--nub-x', nubX + 'px');
 
-    // Trigger animation
+    // Trigger scale-in animation on next frame
     requestAnimationFrame(() => {
       popover.classList.add('active');
     });
-  }, [type, config.buttonIndex]);
+  }, [type, config]);
+
+  if (!type || !config) return null;
 
   return (
     <>
-      <div className="popover-backdrop" onClick={onClose} />
+      <div className="popover-overlay" onClick={onClose} />
       <div className="popover" ref={popoverRef}>
         <div className="popover-nub" />
-        <h3 className="popover-title">{config.heading}</h3>
+        <h3 className="popover-heading">{config.heading}</h3>
         <button
-          className={`popover-btn ${isUsed ? 'disabled' : ''}`}
+          className={`popover-btn ${config.btnClass} ${isUsed ? 'disabled' : ''}`}
           onClick={handleUse}
           disabled={isUsed}
         >
