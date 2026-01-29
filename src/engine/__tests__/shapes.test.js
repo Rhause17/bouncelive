@@ -58,6 +58,55 @@ describe('Shape common interface', () => {
         for (let i = 0; i < 30; i++) s.update(1 / 60);
         expect(s.opacity).toBeLessThan(1);
       });
+
+      it('has getBoundingBox returning valid AABB', () => {
+        const s = createShape(type, 150, 150, 0);
+        const box = s.getBoundingBox();
+        expect(box).toBeDefined();
+        expect(typeof box.x).toBe('number');
+        expect(typeof box.y).toBe('number');
+        expect(typeof box.width).toBe('number');
+        expect(typeof box.height).toBe('number');
+        expect(box.width).toBeGreaterThan(0);
+        expect(box.height).toBeGreaterThanOrEqual(0); // LineSegment can have 0 height
+      });
+
+      it('getBoundingBox contains shape center', () => {
+        const s = createShape(type, 150, 150, 0);
+        const box = s.getBoundingBox();
+        // Shape center should be within bounding box
+        expect(s.x).toBeGreaterThanOrEqual(box.x);
+        expect(s.x).toBeLessThanOrEqual(box.x + box.width);
+        expect(s.y).toBeGreaterThanOrEqual(box.y);
+        expect(s.y).toBeLessThanOrEqual(box.y + box.height);
+      });
+
+      it('getBoundingBoxAt returns translated box', () => {
+        const s = createShape(type, 150, 150, 0);
+        const originalBox = s.getBoundingBox();
+        const translatedBox = s.getBoundingBoxAt(250, 250);
+        expect(translatedBox.width).toBe(originalBox.width);
+        expect(translatedBox.height).toBe(originalBox.height);
+        expect(translatedBox.x).toBe(originalBox.x + 100);
+        expect(translatedBox.y).toBe(originalBox.y + 100);
+      });
+
+      it('getTouchBounds returns minimum 44x44 area', () => {
+        const s = createShape(type, 150, 150, 0);
+        const touchBounds = s.getTouchBounds();
+        expect(touchBounds.width).toBeGreaterThanOrEqual(44);
+        expect(touchBounds.height).toBeGreaterThanOrEqual(44);
+      });
+
+      it('touchAreaContains returns true for center point', () => {
+        const s = createShape(type, 150, 150, 0);
+        expect(s.touchAreaContains(150, 150)).toBe(true);
+      });
+
+      it('touchAreaContains returns false for far away point', () => {
+        const s = createShape(type, 150, 150, 0);
+        expect(s.touchAreaContains(500, 500)).toBe(false);
+      });
     });
   });
 });

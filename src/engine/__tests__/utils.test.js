@@ -101,3 +101,93 @@ describe('Utils - roundRect', () => {
     expect(calls[calls.length - 1]).toBe('closePath');
   });
 });
+
+describe('Utils - One-way corner collision', () => {
+  // Mock shape with 3 segments (triangle-like)
+  // Only side 0 is allowed, sides 1 and 2 are forbidden
+  const createMockShape = (allowedSides) => ({
+    oneWayEnabled: true,
+    oneWayAllowedSides: allowedSides,
+    getSegments: () => [
+      { a: { x: 0, y: 0 }, b: { x: 10, y: 0 } },   // side 0
+      { a: { x: 10, y: 0 }, b: { x: 5, y: 10 } },  // side 1
+      { a: { x: 5, y: 10 }, b: { x: 0, y: 0 } },   // side 2
+    ],
+  });
+
+  it('corner collision between allowed and forbidden side should vanish', () => {
+    const shape = createMockShape([0]); // Only side 0 allowed
+    const seg = shape.getSegments()[0];
+
+    // Collision at corner B (t ≈ 1.0) - between side 0 and side 1
+    // Side 0 is allowed, side 1 is forbidden → should vanish
+    const collision = { t: 0.98 };
+    const result = Utils.evaluateOneWayCollision(shape, seg, 0, collision);
+
+    expect(result.isOneWay).toBe(true);
+    expect(result.shouldVanish).toBe(true);
+  });
+
+  it('corner collision between two allowed sides should bounce', () => {
+    const shape = createMockShape([0, 1]); // Sides 0 and 1 allowed
+    const seg = shape.getSegments()[0];
+
+    // Collision at corner B (t ≈ 1.0) - between side 0 and side 1
+    // Both sides allowed → should bounce
+    const collision = { t: 0.98 };
+    const result = Utils.evaluateOneWayCollision(shape, seg, 0, collision);
+
+    expect(result.isOneWay).toBe(true);
+    expect(result.shouldVanish).toBe(false);
+    expect(result.isBounceSide).toBe(true);
+  });
+
+  it('non-corner collision on allowed side should bounce', () => {
+    const shape = createMockShape([0]);
+    const seg = shape.getSegments()[0];
+
+    // Collision in middle of segment (t ≈ 0.5)
+    const collision = { t: 0.5 };
+    const result = Utils.evaluateOneWayCollision(shape, seg, 0, collision);
+
+    expect(result.isOneWay).toBe(true);
+    expect(result.shouldVanish).toBe(false);
+    expect(result.isBounceSide).toBe(true);
+  });
+
+  it('non-corner collision on forbidden side should vanish', () => {
+    const shape = createMockShape([0]);
+    const seg = shape.getSegments()[1]; // Side 1, forbidden
+
+    // Collision in middle of segment (t ≈ 0.5)
+    const collision = { t: 0.5 };
+    const result = Utils.evaluateOneWayCollision(shape, seg, 1, collision);
+
+    expect(result.isOneWay).toBe(true);
+    expect(result.shouldVanish).toBe(true);
+  });
+
+  it('corner A collision checks previous segment', () => {
+    const shape = createMockShape([1]); // Only side 1 allowed
+    const seg = shape.getSegments()[1];
+
+    // Collision at corner A (t ≈ 0) - between side 0 and side 1
+    // Side 1 is allowed, side 0 is forbidden → should vanish
+    const collision = { t: 0.02 };
+    const result = Utils.evaluateOneWayCollision(shape, seg, 1, collision);
+
+    expect(result.isOneWay).toBe(true);
+    expect(result.shouldVanish).toBe(true);
+  });
+
+  it('works without collision param (backwards compatible)', () => {
+    const shape = createMockShape([0]);
+    const seg = shape.getSegments()[0];
+
+    // No collision param - should use normal logic
+    const result = Utils.evaluateOneWayCollision(shape, seg, 0);
+
+    expect(result.isOneWay).toBe(true);
+    expect(result.shouldVanish).toBe(false);
+  });
+});

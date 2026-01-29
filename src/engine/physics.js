@@ -58,7 +58,7 @@ export class Physics {
         );
         if (!collision) continue;
 
-        const oneWayResult = Utils.evaluateOneWayCollision(shape, seg, segIdx);
+        const oneWayResult = Utils.evaluateOneWayCollision(shape, seg, segIdx, collision);
 
         if (oneWayResult.shouldVanish) {
           this.collisionEvents.push({

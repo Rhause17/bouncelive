@@ -36,6 +36,61 @@ export class HalfCircle extends Shape {
     return segs;
   }
 
+  getBoundingBox() {
+    // Half circle arc from rotation to rotation + PI
+    const startAngle = this.rotation;
+    const endAngle = this.rotation + Math.PI;
+
+    // Start with the two endpoints
+    const points = [
+      { x: this.x + Math.cos(startAngle) * this.radius, y: this.y + Math.sin(startAngle) * this.radius },
+      { x: this.x + Math.cos(endAngle) * this.radius, y: this.y + Math.sin(endAngle) * this.radius },
+    ];
+
+    // Check if cardinal directions (0, π/2, π, 3π/2) fall within the arc
+    // and add those extreme points
+    const cardinals = [0, Math.PI / 2, Math.PI, Math.PI * 1.5];
+    for (const angle of cardinals) {
+      if (this._isAngleInArc(angle, startAngle, endAngle)) {
+        points.push({
+          x: this.x + Math.cos(angle) * this.radius,
+          y: this.y + Math.sin(angle) * this.radius,
+        });
+      }
+    }
+
+    // Find bounding box from all points
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    for (const p of points) {
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  }
+
+  _isAngleInArc(angle, start, end) {
+    // Normalize angles to [0, 2π)
+    const norm = (a) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    const a = norm(angle);
+    const s = norm(start);
+    const e = norm(end);
+
+    if (s <= e) {
+      return a >= s && a <= e;
+    } else {
+      return a >= s || a <= e;
+    }
+  }
+
   containsPoint(px, py) {
     const dist = Math.sqrt((px - this.x) ** 2 + (py - this.y) ** 2);
     return dist < this.radius + 12;

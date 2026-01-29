@@ -41,13 +41,15 @@ export default function PowerupPopover({ type, onClose, onEnterRemoveMode }) {
   const handleUse = () => {
     if (!config || isUsed || count <= 0) return;
 
-    dispatch({ type: config.actionType });
-
+    // For R powerup, don't mark as "used" yet - only enter selection mode
+    // The powerup will be marked as used when a shape is actually removed
     if (type === 'R') {
       onClose();
       if (onEnterRemoveMode) onEnterRemoveMode();
       return;
     }
+
+    dispatch({ type: config.actionType });
 
     if (type === 'E') {
       const go = gameObjects.current;

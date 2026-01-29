@@ -47,16 +47,32 @@ export function predictTrajectory(physics, shapes, basket, ballSpawnX, ballUpper
           );
           if (!collision) continue;
 
-          const oneWayResult = Utils.evaluateOneWayCollision(shape, seg, segIdx);
+          const oneWayResult = Utils.evaluateOneWayCollision(shape, seg, segIdx, collision);
 
           if (oneWayResult.shouldVanish) {
             const collPt = { x: collision.closest.x, y: collision.closest.y };
+
+            // Check if collision point is too close to last sample - if so, replace instead of add
+            // This prevents tiny "kink" segments at the end of trajectory
+            const lastPt = reboundPoints[reboundPoints.length - 1];
+            const distToLast = Math.sqrt((collPt.x - lastPt.x) ** 2 + (collPt.y - lastPt.y) ** 2);
+            const MIN_ENDPOINT_DIST = MIN_SAMPLE_DIST * 1.5; // 9px threshold
+
             if (bounceCount === 0) {
               hitPoint = { x: collPt.x, y: collPt.y, isVanish: true };
-              reboundPoints.push({ x: collPt.x, y: collPt.y, time: totalTime, kind: 'vanish' });
+              if (distToLast < MIN_ENDPOINT_DIST && reboundPoints.length > 1) {
+                // Replace last sample with collision point
+                reboundPoints[reboundPoints.length - 1] = { x: collPt.x, y: collPt.y, time: totalTime, kind: 'vanish' };
+              } else {
+                reboundPoints.push({ x: collPt.x, y: collPt.y, time: totalTime, kind: 'vanish' });
+              }
               return { hitPoint, reboundPoints, hitShape: true, maxSteps: reboundPoints.length, willVanish: true };
             } else {
-              reboundPoints.push({ x: collPt.x, y: collPt.y, time: totalTime, kind: 'end' });
+              if (distToLast < MIN_ENDPOINT_DIST && reboundPoints.length > 1) {
+                reboundPoints[reboundPoints.length - 1] = { x: collPt.x, y: collPt.y, time: totalTime, kind: 'end' };
+              } else {
+                reboundPoints.push({ x: collPt.x, y: collPt.y, time: totalTime, kind: 'end' });
+              }
               return { hitPoint, reboundPoints, hitShape: true, maxSteps: reboundPoints.length, willVanish: false };
             }
           }
@@ -76,7 +92,18 @@ export function predictTrajectory(physics, shapes, basket, ballSpawnX, ballUpper
             if (hitPoint === null) {
               hitPoint = { x: collPt.x, y: collPt.y };
             }
-            reboundPoints.push({ x: collPt.x, y: collPt.y, time: totalTime, kind: 'collision' });
+
+            // Check if collision point is too close to last sample - if so, replace instead of add
+            const lastPt = reboundPoints[reboundPoints.length - 1];
+            const distToLast = Math.sqrt((collPt.x - lastPt.x) ** 2 + (collPt.y - lastPt.y) ** 2);
+            const MIN_ENDPOINT_DIST = MIN_SAMPLE_DIST * 1.5;
+
+            if (distToLast < MIN_ENDPOINT_DIST && reboundPoints.length > 1) {
+              reboundPoints[reboundPoints.length - 1] = { x: collPt.x, y: collPt.y, time: totalTime, kind: 'collision' };
+            } else {
+              reboundPoints.push({ x: collPt.x, y: collPt.y, time: totalTime, kind: 'collision' });
+            }
+
             lastSampleX = collPt.x;
             lastSampleY = collPt.y;
             bounceCount++;

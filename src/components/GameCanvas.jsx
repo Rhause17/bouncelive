@@ -14,6 +14,7 @@ export default function GameCanvas() {
   const { state, dispatch, gameObjects, setupLevel, submit, nextLevel } = useGame();
   const { width, height } = useCanvasSize();
   const patternCanvasRef = useRef(null);
+  const lastTapTimeRef = useRef(0); // For double-tap detection
 
   // Create background dot pattern once
   useEffect(() => {
@@ -371,7 +372,8 @@ export default function GameCanvas() {
         return;
       }
 
-      if (shape.containsPoint(x, y)) {
+      if (shape.touchAreaContains(x, y)) {
+        shape.saveDragStart(); // Save position for snap-back on invalid drop
         dragState.current = {
           isDragging: true,
           isRotating: false,
@@ -404,8 +406,15 @@ export default function GameCanvas() {
       return;
     }
 
-    // Deselect
-    dispatch({ type: 'DESELECT_SHAPE' });
+    // Empty area tap - only deselect on double-tap (300ms threshold)
+    const now = Date.now();
+    const isDoubleTap = (now - lastTapTimeRef.current) < 300;
+    lastTapTimeRef.current = now;
+
+    if (isDoubleTap) {
+      dispatch({ type: 'DESELECT_SHAPE' });
+    }
+    // Single tap on empty area = no-op (selection preserved)
   }, [state, gameObjects, dispatch, submit, getCanvasCoords]);
 
   const handlePointerMove = useCallback((e) => {
@@ -428,17 +437,42 @@ export default function GameCanvas() {
     if (ds.isRotating && ds.shapeIndex >= 0) {
       const shape = go.shapes[ds.shapeIndex];
       const center = shape.getCenter();
-      shape.rotation = Math.atan2(y - center.y, x - center.x) + Math.PI / 2;
+      const newRotation = Math.atan2(y - center.y, x - center.x) + Math.PI / 2;
+
+      // Only apply rotation if it doesn't cause overlap (5px gap)
+      if (!shape.wouldOverlapAtRotation(newRotation, go.shapes, 5)) {
+        shape.rotation = newRotation;
+      }
+      // If overlap would occur, rotation stays at last valid angle
     }
 
     if (ds.isSwipingAngle && state.selectedShapeIndex >= 0) {
       const shape = go.shapes[state.selectedShapeIndex];
       const delta = (clientX - ds.swipeStartX) * LAYOUT.degreeSwipeSensitivity;
-      shape.rotation = ds.angleAtSwipeStart + delta * Math.PI / 180;
+      const newRotation = ds.angleAtSwipeStart + delta * Math.PI / 180;
+
+      // Only apply rotation if it doesn't cause overlap (5px gap)
+      if (!shape.wouldOverlapAtRotation(newRotation, go.shapes, 5)) {
+        shape.rotation = newRotation;
+      }
     }
   }, [state, gameObjects, dispatch, getCanvasCoords]);
 
   const handlePointerUp = useCallback(() => {
+    const ds = dragState.current;
+    const go = gameObjects.current;
+
+    // Check for overlap on drag release and snap back if invalid
+    if (ds.isDragging && ds.shapeIndex >= 0) {
+      const shape = go.shapes[ds.shapeIndex];
+      if (shape.hasOverlap(go.shapes, 5)) {
+        // Invalid position - snap back to drag start
+        shape.returnToDragStart();
+        // TODO: Add shake animation for visual feedback
+      }
+      updateCanSubmit(go, dispatch, state);
+    }
+
     dragState.current = {
       isDragging: false,
       isRotating: false,
@@ -449,7 +483,7 @@ export default function GameCanvas() {
       swipeStartX: 0,
       angleAtSwipeStart: 0,
     };
-  }, []);
+  }, [gameObjects, dispatch, state]);
 
   // ========================================
   // RENDER

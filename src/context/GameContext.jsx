@@ -155,8 +155,16 @@ function gameReducer(state, action) {
       return { ...state, selectRemoveTargetMode: false };
 
     case 'REMOVE_SHAPE': {
-      // Shape removal is handled via gameObjects; this just updates state
-      return { ...state, selectRemoveTargetMode: false };
+      // Shape removal is handled via gameObjects; this updates state AND marks powerup as used
+      if (state.rUsedThisLevel || state.removeCount <= 0) {
+        return { ...state, selectRemoveTargetMode: false };
+      }
+      return {
+        ...state,
+        selectRemoveTargetMode: false,
+        removeCount: state.removeCount - 1,
+        rUsedThisLevel: true,
+      };
     }
 
     case 'USE_TRAJECTORY_POWERUP':
@@ -343,34 +351,36 @@ export function GameProvider({ children }) {
     const availableWidth = boxRight - boxLeft;
     const centerY = go.pieceAreaY + go.pieceAreaHeight / 2;
 
-    // Create shapes to measure extents
+    // Create shapes to measure extents using bounding boxes
+    const MIN_GAP = 5; // Minimum gap between shapes (spec requirement)
     const tempShapes = selectedTypes.map((t, i) => createShape(t, 0, 0, i));
-    const shapeHalfWidths = tempShapes.map(s => {
-      const segs = s.getSegments();
-      if (segs.length === 0) return 25 * SIZE_SCALE;
-      let maxX = 0;
-      for (const seg of segs) {
-        maxX = Math.max(maxX, Math.abs(seg.a.x - s.x), Math.abs(seg.b.x - s.x));
-      }
-      return maxX + 5;
+    const shapeWidths = tempShapes.map(s => {
+      const box = s.getBoundingBox();
+      return box.width;
     });
 
-    const totalShapeWidth = shapeHalfWidths.reduce((sum, hx) => sum + 2 * hx, 0);
-    let gap = 20;
-    let totalWidth = totalShapeWidth + gap * (numShapes - 1);
-    if (totalWidth > availableWidth && numShapes > 1) {
-      gap = Math.max(2, (availableWidth - totalShapeWidth) / (numShapes - 1));
-      totalWidth = totalShapeWidth + gap * (numShapes - 1);
+    const totalShapeWidth = shapeWidths.reduce((sum, w) => sum + w, 0);
+
+    // Evenly distribute shapes across the available width
+    // Gap = (available space - total shape width) / (numShapes - 1)
+    let gap;
+    if (numShapes <= 1) {
+      gap = 0;
+    } else {
+      gap = (availableWidth - totalShapeWidth) / (numShapes - 1);
+      // Ensure minimum gap
+      gap = Math.max(MIN_GAP, gap);
     }
 
-    const startX = boxLeft + Math.max(0, (availableWidth - totalWidth) / 2);
+    // Start from left edge (shapes will fill the width evenly)
+    const startX = boxLeft;
 
     go.shapes = [];
     let currentX = startX;
     for (let i = 0; i < numShapes; i++) {
-      const hx = shapeHalfWidths[i];
-      const xPos = currentX + hx;
-      currentX += 2 * hx + (i < numShapes - 1 ? gap : 0);
+      const shapeWidth = shapeWidths[i];
+      const xPos = currentX + shapeWidth / 2;
+      currentX += shapeWidth + (i < numShapes - 1 ? gap : 0);
 
       const shape = createShape(selectedTypes[i], xPos, centerY, i);
       shape.startX = shape.x;

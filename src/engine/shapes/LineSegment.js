@@ -19,6 +19,20 @@ export class LineSegment extends Shape {
 
   getSegments() { const e = this.getEndpoints(); return [{ a: e.a, b: e.b }]; }
 
+  getBoundingBox() {
+    const e = this.getEndpoints();
+    const minX = Math.min(e.a.x, e.b.x);
+    const maxX = Math.max(e.a.x, e.b.x);
+    const minY = Math.min(e.a.y, e.b.y);
+    const maxY = Math.max(e.a.y, e.b.y);
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  }
+
   containsPoint(px, py) {
     return Utils.pointToSegment({ x: px, y: py }, this.getEndpoints().a, this.getEndpoints().b).dist < 15;
   }
