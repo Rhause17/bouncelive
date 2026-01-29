@@ -181,6 +181,7 @@ export class Shape {
    */
   overlapsWithShape(other, gap = 5) {
     if (other === this) return false;
+    if (other.removedByPowerup) return false;
 
     const boxA = this.getBoundingBox();
     const boxB = other.getBoundingBox();
@@ -204,6 +205,7 @@ export class Shape {
    */
   wouldOverlapAt(newX, newY, other, gap = 5) {
     if (other === this) return false;
+    if (other.removedByPowerup) return false;
 
     const boxA = this.getBoundingBoxAt(newX, newY);
     const boxB = other.getBoundingBox();
