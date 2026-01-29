@@ -6,12 +6,13 @@ import { writeSave } from '../lib/cloudSave.js';
 import { updateLeaderboardEntry } from '../lib/leaderboard.js';
 
 export default function WinOverlay() {
-  const { state, nextLevel } = useGame();
+  const { state, nextLevel, dispatch } = useGame();
   const { user } = useAuth();
   const transitioningRef = useRef(false);
   const savedRef = useRef(false);
 
   const isWin = state.gameState === 'win';
+  const isFail = state.gameState === 'fail';
   const livesRatio = isWin ? state.lives / state.initialLives : 0;
   const stars = livesRatio >= 0.7 ? 3 : livesRatio >= 0.4 ? 2 : 1;
 
@@ -36,8 +37,6 @@ export default function WinOverlay() {
     if (!isWin) savedRef.current = false;
   }, [isWin]);
 
-  if (!isWin) return null;
-
   const handleNextLevel = () => {
     if (transitioningRef.current) return;
     transitioningRef.current = true;
@@ -60,22 +59,46 @@ export default function WinOverlay() {
     }
   };
 
-  return (
-    <div className="game-overlay active win">
-      <div className="overlay-content">
-        <h2 className="overlay-text">SUCCESS!</h2>
-        <p className="level-complete-text">Level {state.level} Complete</p>
-        <div className="stars">
-          {[1, 2, 3].map(i => (
-            <span key={i} className={`star ${i <= stars ? 'filled' : ''}`}>
-              {'\u2605'}
-            </span>
-          ))}
+  const handleReturnToMenu = () => {
+    dispatch({ type: 'RETURN_TO_MENU' });
+  };
+
+  // Win overlay
+  if (isWin) {
+    return (
+      <div className="game-overlay active win">
+        <div className="overlay-content">
+          <h2 className="overlay-text">SUCCESS!</h2>
+          <p className="level-complete-text">Level {state.level} Complete</p>
+          <div className="stars">
+            {[1, 2, 3].map(i => (
+              <span key={i} className={`star ${i <= stars ? 'filled' : ''}`}>
+                {'\u2605'}
+              </span>
+            ))}
+          </div>
+          <button className="next-level-btn" onClick={handleNextLevel}>
+            Next Level
+          </button>
         </div>
-        <button className="next-level-btn" onClick={handleNextLevel}>
-          Next Level
-        </button>
       </div>
-    </div>
-  );
+    );
+  }
+
+  // Fail overlay
+  if (isFail) {
+    return (
+      <div className="game-overlay active fail">
+        <div className="overlay-content">
+          <h2 className="overlay-text">YOU FAILED!</h2>
+          <p className="level-complete-text">Level Reached: {state.highestCompletedLevel > 0 ? state.highestCompletedLevel : 1}</p>
+          <button className="retry-btn" onClick={handleReturnToMenu}>
+            Main Menu
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }

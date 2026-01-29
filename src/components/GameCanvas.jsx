@@ -162,6 +162,24 @@ export default function GameCanvas() {
       ctx.setLineDash([8, 6]);
       ctx.stroke();
       ctx.setLineDash([]);
+
+      // Hint text above piece area - only on level 1, fades when piece moved
+      if (state.level === 1 && go.pieceHintAlpha > 0) {
+        // Fade out when any piece has been moved
+        const anyMoved = go.shapes.some(s => s.hasBeenMoved);
+        if (anyMoved && go.pieceHintAlpha > 0) {
+          go.pieceHintAlpha = Math.max(0, go.pieceHintAlpha - 0.05);
+        }
+
+        ctx.save();
+        ctx.globalAlpha = go.pieceHintAlpha;
+        ctx.font = `700 ${L.controlBoxFontSize * 0.85}px Nunito, sans-serif`;
+        ctx.fillStyle = T.textSecondary;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('Place objects to submit', w / 2, go.pieceAreaY - 10);
+        ctx.restore();
+      }
     }
 
     // ===== BASKET LINE =====
@@ -199,17 +217,32 @@ export default function GameCanvas() {
     // ===== VFX =====
     go.vfx.draw(ctx);
 
-    // ===== ONE-WAY TUTORIAL =====
-    if (state.tutorialActive) {
-      drawOneWayTutorial(ctx, w, h, T);
+    // ===== BOTTOM CONTROLS =====
+    const powerupY = h - L.powerupAreaHeight;
+    const bottomOffset = (L.bottomControlsHeight + L.powerupAreaHeight) * (1 - animEase);
+
+    ctx.save();
+    ctx.translate(0, bottomOffset);
+
+    drawBottomControls(ctx, w, h, state, go, T, L);
+    drawPowerupArea(ctx, w, h, state, T, L, powerupY);
+
+    ctx.restore();
+
+    // ===== REMOVE MODE OVERLAY (after bottom controls to cover them) =====
+    // Animate tint alpha
+    if (state.selectRemoveTargetMode) {
+      go.removeModeAlpha = Math.min(1, go.removeModeAlpha + 0.08);
+    } else {
+      go.removeModeAlpha = Math.max(0, go.removeModeAlpha - 0.12);
     }
 
-    // ===== REMOVE MODE OVERLAY =====
-    if (state.selectRemoveTargetMode) {
-      // Dark tint over everything except powerup area
-      const powerupTop = h - LAYOUT.powerupAreaHeight;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-      ctx.fillRect(0, 0, w, powerupTop);
+    if (go.removeModeAlpha > 0) {
+      const tintAlpha = go.removeModeAlpha * 0.65;
+
+      // Dark tint over ENTIRE screen
+      ctx.fillStyle = `rgba(0, 0, 0, ${tintAlpha})`;
+      ctx.fillRect(0, 0, w, h);
 
       // Re-draw shapes above tint with pulsing red glow
       const glowPulse = 0.6 + 0.3 * Math.sin(go.time * 4);
@@ -218,7 +251,7 @@ export default function GameCanvas() {
         if (!s.isVisible()) return;
 
         ctx.save();
-        ctx.globalAlpha = s.opacity != null ? s.opacity : 1;
+        ctx.globalAlpha = (s.opacity != null ? s.opacity : 1) * go.removeModeAlpha;
 
         // Pulsing red glow
         ctx.shadowColor = `rgba(248, 113, 113, ${glowPulse})`;
@@ -246,24 +279,21 @@ export default function GameCanvas() {
       });
 
       // Hint text
+      ctx.save();
+      ctx.globalAlpha = go.removeModeAlpha;
       ctx.font = `700 ${16 * SIZE_SCALE}px Nunito, sans-serif`;
       ctx.fillStyle = '#f87171';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('Tap an object to remove', w / 2, powerupTop - 30);
+      const hintY = h - L.powerupAreaHeight - 30;
+      ctx.fillText('Tap an object to remove', w / 2, hintY);
+      ctx.restore();
     }
 
-    // ===== BOTTOM CONTROLS =====
-    const powerupY = h - L.powerupAreaHeight;
-    const bottomOffset = (L.bottomControlsHeight + L.powerupAreaHeight) * (1 - animEase);
-
-    ctx.save();
-    ctx.translate(0, bottomOffset);
-
-    drawBottomControls(ctx, w, h, state, go, T, L);
-    drawPowerupArea(ctx, w, h, state, T, L, powerupY);
-
-    ctx.restore();
+    // ===== ONE-WAY TUTORIAL (drawn last to cover everything) =====
+    if (state.tutorialActive) {
+      drawOneWayTutorial(ctx, w, h, T);
+    }
 
     // End screen shake
     ctx.restore();
@@ -939,7 +969,10 @@ function getPowerupButtonHit(canvas, x, y) {
   return null;
 }
 
-function drawOneWayTutorial(ctx, w, h, T) {
+function drawOneWayTutorial(ctx, w, h, T, tutorialAlpha = 1) {
+  ctx.save();
+  ctx.globalAlpha = tutorialAlpha;
+
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
   ctx.fillRect(0, 0, w, h);
 
@@ -960,55 +993,39 @@ function drawOneWayTutorial(ctx, w, h, T) {
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
 
-  ctx.strokeStyle = T.glassBorder || 'rgba(255, 255, 255, 0.1)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = T.oneWayHighlight || '#FF00AA';
+  ctx.lineWidth = 2;
   ctx.stroke();
 
-  // Title
-  ctx.fillStyle = T.textPrimary;
-  ctx.font = `bold ${44 * SIZE_SCALE}px Nunito, sans-serif`;
+  // Title - prominent header style
+  ctx.fillStyle = T.oneWayHighlight || '#FF00AA';
+  ctx.font = `900 ${48 * SIZE_SCALE}px Nunito, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('One-Way Bounce', w / 2, boxY + 65);
+  ctx.fillText('ONE-WAY BOUNCE', w / 2, boxY + 60);
 
-  // Body text with highlighted "this side"
-  const bodyY = boxY + 130;
-  const regularFont = `${32 * SIZE_SCALE}px Nunito, sans-serif`;
-  const boldFont = `bold ${32 * SIZE_SCALE}px Nunito, sans-serif`;
-
-  const text1 = 'Ball will bounce from only ';
-  const text2 = 'this side';
-  const text3 = '.';
-
-  ctx.font = regularFont;
-  const text1W = ctx.measureText(text1).width;
-  ctx.font = boldFont;
-  const text2W = ctx.measureText(text2).width;
-  ctx.font = regularFont;
-  const text3W = ctx.measureText(text3).width;
-
-  const totalW = text1W + text2W + text3W;
-  const startX = (w - totalW) / 2;
-
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = T.textSecondary;
-  ctx.font = regularFont;
-  ctx.fillText(text1, startX, bodyY);
-
-  ctx.fillStyle = T.oneWayHighlight || '#f97316';
-  ctx.font = boldFont;
-  ctx.fillText(text2, startX + text1W, bodyY);
+  // Body text line 1
+  const bodyY1 = boxY + 125;
+  const bodyY2 = boxY + 170;
+  const regularFont = `${30 * SIZE_SCALE}px Nunito, sans-serif`;
+  const highlightFont = `900 ${34 * SIZE_SCALE}px Nunito, sans-serif`;
 
   ctx.fillStyle = T.textSecondary;
   ctx.font = regularFont;
-  ctx.fillText(text3, startX + text1W + text2W, bodyY);
+  ctx.textAlign = 'center';
+  ctx.fillText('Ball will bounce from only', w / 2, bodyY1);
+
+  // "THIS SIDE" on separate line, highlighted
+  ctx.fillStyle = T.oneWayHighlight || '#FF00AA';
+  ctx.font = highlightFont;
+  ctx.fillText('THIS SIDE', w / 2, bodyY2);
 
   // Dismiss instruction
   ctx.fillStyle = T.textMuted;
   ctx.font = `${24 * SIZE_SCALE}px Nunito, sans-serif`;
-  ctx.textAlign = 'center';
   ctx.fillText('Tap anywhere to continue', w / 2, boxY + boxH - 35);
+
+  ctx.restore();
 }
 
 function updateCanSubmit(go, dispatch, state) {

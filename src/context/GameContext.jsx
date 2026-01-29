@@ -117,14 +117,20 @@ function gameReducer(state, action) {
       if (state.lives <= 0) {
         return {
           ...state,
-          screen: 'welcome',
-          gameState: 'edit',
+          gameState: 'fail',
         };
       }
       return {
         ...state,
         gameState: 'edit',
         canSubmit: state.allShapesPlaced && state.lives > 0,
+      };
+
+    case 'RETURN_TO_MENU':
+      return {
+        ...state,
+        screen: 'welcome',
+        gameState: 'edit',
       };
 
     case 'SET_CAN_SUBMIT':
@@ -242,6 +248,8 @@ export function GameProvider({ children }) {
     // Animation state
     time: 0,
     hudAnimProgress: 0,
+    removeModeAlpha: 0,
+    pieceHintAlpha: 1,
     hudStateOffset: 0,
     targetHudOffset: 0,
     submitButtonGlow: 0,
@@ -269,6 +277,8 @@ export function GameProvider({ children }) {
     go.hudAnimProgress = 0;
     go.basketWidenProgress = 1;
     go.basketOriginalRadius = null;
+    go.removeModeAlpha = 0;
+    go.pieceHintAlpha = 1;
 
     const w = canvasWidth;
     const h = canvasHeight;

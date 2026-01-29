@@ -424,7 +424,7 @@ body {
 
 .star {
   font-size: 2rem;
-  color: #2D3348;
+  color: rgba(255, 255, 0, 0.25);
   transition: color 0.3s, text-shadow 0.3s;
 }
 
@@ -485,9 +485,8 @@ body {
 
 .popover-overlay {
   position: absolute;
-  top: 0; left: 0; right: 0;
-  bottom: 60px;
-  background: rgba(10, 14, 26, 0.7);
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(10, 14, 26, 0.75);
   z-index: 50;
   opacity: 1;
   pointer-events: auto;
@@ -495,7 +494,7 @@ body {
 
 .popover {
   position: absolute;
-  bottom: 70px;
+  bottom: 95px;
   z-index: 100;
   background: var(--bg-panel);
   border: 1px solid var(--neon-cyan);

@@ -149,43 +149,41 @@ export class Basket {
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // RIM - thick top edge with glow (like basketball hoop)
-    ctx.shadowColor = theme.basketStroke;
+    // TOP BARRIER - single line that opens from center outward
+    const barrierColor = this.lidOpen ? theme.basketStroke : theme.basketLid;
+    const barrierGlow = this.lidOpen ? theme.basketStroke : theme.basketLidGlow;
+
+    // Opening animation: line splits from center and moves outward
+    const openAmount = this.lidOpenProgress; // 0 = closed, 1 = fully open
+    const halfWidth = hw + 4;
+    const gapHalf = openAmount * halfWidth; // Gap grows from center
+
+    ctx.shadowColor = barrierGlow;
     ctx.shadowBlur = 8;
-    ctx.beginPath();
-    ctx.moveTo(this.x - hw - 4, this.y);
-    ctx.lineTo(this.x + hw + 4, this.y);
-    ctx.strokeStyle = theme.basketRim;
+    ctx.strokeStyle = barrierColor;
     ctx.lineWidth = 5;
     ctx.lineCap = 'round';
-    ctx.stroke();
-    ctx.shadowBlur = 0;
 
-    // Inner rim highlight
-    ctx.beginPath();
-    ctx.moveTo(this.x - hw + 2, this.y + 2);
-    ctx.lineTo(this.x + hw - 2, this.y + 2);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    if (openAmount < 1) {
+      // Draw left segment (from left edge to center-gap)
+      if (this.x - halfWidth < this.x - gapHalf) {
+        ctx.beginPath();
+        ctx.moveTo(this.x - halfWidth, this.y);
+        ctx.lineTo(this.x - gapHalf, this.y);
+        ctx.stroke();
+      }
 
-    // Lid (barrier that opens)
-    if (this.lidOpenProgress < 1) {
-      const lidY = this.y - this.lidOpenProgress * 15;
-      const lidAlpha = 1 - this.lidOpenProgress;
-
-      ctx.globalAlpha = lidAlpha;
-      ctx.shadowColor = theme.basketLidGlow;
-      ctx.shadowBlur = 12;
-      ctx.beginPath();
-      ctx.moveTo(this.x - hw - 2, lidY);
-      ctx.lineTo(this.x + hw + 2, lidY);
-      ctx.strokeStyle = theme.basketLid;
-      ctx.lineWidth = 4;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
+      // Draw right segment (from center+gap to right edge)
+      if (this.x + gapHalf < this.x + halfWidth) {
+        ctx.beginPath();
+        ctx.moveTo(this.x + gapHalf, this.y);
+        ctx.lineTo(this.x + halfWidth, this.y);
+        ctx.stroke();
+      }
     }
+    // When fully open (openAmount >= 1), don't draw the barrier at all
+
+    ctx.shadowBlur = 0;
 
     ctx.restore();
   }
