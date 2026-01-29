@@ -758,101 +758,110 @@ function drawPowerupArea(ctx, w, h, state, T, L, powerupY) {
     Utils.roundRect(ctx, bx, btnY, btnSize, btnSize, L.boxCornerRadius);
     ctx.stroke();
 
-    // Draw icon
+    // Draw icon - CENTERED, consistent sizes across all powerups
     const isDisabled = btn.count <= 0;
     const iconColor = isDisabled ? 'rgba(100, 116, 139, 0.5)' : T.textPrimary;
     const centerX = bx + btnSize / 2;
     const centerY = btnY + btnSize / 2;
+    const iconCenterY = centerY - 10; // Shift icon up for better spacing from count
+
+    // Consistent icon bounding box: 22x22 for all icons
+    const iconSize = 11; // Half-size, so total is 22x22
 
     ctx.save();
-    ctx.translate(centerX, centerY);
+    ctx.translate(centerX, iconCenterY);
 
     if (btn.label === 'T') {
-      // Trajectory icon: dotted arc + ball + arrowhead
+      // Trajectory icon: SYMMETRIC CURVED PATH with ball and arrow
       ctx.strokeStyle = iconColor;
       ctx.lineWidth = 2;
-      ctx.setLineDash([2, 3]);
+      ctx.setLineDash([2.5, 2.5]);
       ctx.beginPath();
-      ctx.arc(-8, 4, 14, -Math.PI * 0.8, -Math.PI * 0.15);
+      // Symmetric parabola centered at origin, fits in iconSize bounds
+      ctx.moveTo(-iconSize, 5);
+      ctx.quadraticCurveTo(0, -8, iconSize, 5);
       ctx.stroke();
       ctx.setLineDash([]);
 
+      // Ball at start of trajectory (left)
       ctx.beginPath();
-      ctx.arc(-8, -6, 3.5, 0, Math.PI * 2);
+      ctx.arc(-iconSize, 5, 3.5, 0, Math.PI * 2);
       ctx.fillStyle = iconColor;
       ctx.fill();
 
+      // Arrowhead at end (right)
       ctx.beginPath();
-      ctx.moveTo(8, 0);
-      ctx.lineTo(4, -3);
-      ctx.lineTo(4, 3);
+      ctx.moveTo(iconSize + 2, 5);
+      ctx.lineTo(iconSize - 2, 1);
+      ctx.lineTo(iconSize - 2, 9);
       ctx.closePath();
       ctx.fill();
     } else if (btn.label === 'R') {
-      // Hammer icon
+      // Hammer icon - SMALLER and CENTERED
       ctx.fillStyle = iconColor;
       ctx.strokeStyle = iconColor;
-      ctx.lineWidth = 2;
 
+      // Hammer head (smaller, centered)
       ctx.save();
+      ctx.translate(0, -1);
       ctx.rotate(-Math.PI / 4);
-      ctx.fillRect(-10, -5, 12, 10);
+      ctx.fillRect(-6, -4, 12, 8);
       ctx.restore();
 
+      // Handle (shorter, centered)
       ctx.beginPath();
-      ctx.moveTo(-2, 2);
-      ctx.lineTo(8, 12);
+      ctx.moveTo(1, 1);
+      ctx.lineTo(7, 7);
       ctx.lineWidth = 3;
       ctx.lineCap = 'round';
       ctx.stroke();
     } else if (btn.label === 'E') {
-      // Double-sided arrow icon
+      // Expand/Widen icon: CENTERED bidirectional arrow
       ctx.strokeStyle = iconColor;
       ctx.fillStyle = iconColor;
       ctx.lineWidth = 2.5;
       ctx.lineCap = 'round';
 
+      // Horizontal line (fits in iconSize bounds)
       ctx.beginPath();
-      ctx.moveTo(-10, 0);
-      ctx.lineTo(10, 0);
+      ctx.moveTo(-iconSize, 0);
+      ctx.lineTo(iconSize, 0);
       ctx.stroke();
 
+      // Left arrowhead
       ctx.beginPath();
-      ctx.moveTo(-10, 0);
-      ctx.lineTo(-5, -5);
-      ctx.moveTo(-10, 0);
-      ctx.lineTo(-5, 5);
+      ctx.moveTo(-iconSize, 0);
+      ctx.lineTo(-iconSize + 5, -4);
+      ctx.moveTo(-iconSize, 0);
+      ctx.lineTo(-iconSize + 5, 4);
       ctx.stroke();
 
+      // Right arrowhead
       ctx.beginPath();
-      ctx.moveTo(10, 0);
-      ctx.lineTo(5, -5);
-      ctx.moveTo(10, 0);
-      ctx.lineTo(5, 5);
+      ctx.moveTo(iconSize, 0);
+      ctx.lineTo(iconSize - 5, -4);
+      ctx.moveTo(iconSize, 0);
+      ctx.lineTo(iconSize - 5, 4);
       ctx.stroke();
     }
 
     ctx.restore();
 
-    // Count badge (bottom-right corner)
-    const badgeX = bx + btnSize - 8;
-    const badgeY2 = btnY + btnSize - 8;
-    const badgeRadius = 8;
+    // Count displayed INSIDE button, below icon
+    const countY = centerY + 14;
+    const countText = `×${btn.count}`;
 
-    ctx.beginPath();
-    ctx.arc(badgeX, badgeY2, badgeRadius, 0, Math.PI * 2);
-    ctx.fillStyle = isDisabled ? 'rgba(100, 116, 139, 0.6)' : (
-      btn.label === 'T' ? T.secondary :
-      btn.label === 'R' ? (T.danger || '#F87171') :
-      T.secondary
-    );
-    ctx.fill();
-
-    ctx.font = '700 10px Nunito, sans-serif';
-    ctx.fillStyle = isDisabled ? 'rgba(255, 255, 255, 0.5)' : '#0F172A';
+    ctx.font = '800 14px Nunito, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(btn.count.toString(), badgeX, badgeY2);
+
+    if (btn.count > 0) {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(countText, centerX, countY);
+    } else {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.fillText('×0', centerX, countY);
+    }
   });
 }
 

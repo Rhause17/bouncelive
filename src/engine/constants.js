@@ -223,8 +223,8 @@ export const LAYOUT = {
   controlBoxGap: 35,
   controlBoxFontSize: 20,
 
-  powerupAreaHeight: 60,
-  powerupButtonSize: 42,
+  powerupAreaHeight: 80,
+  powerupButtonSize: 56,
 
   boxCornerRadius: 8,
   controlCornerRadius: 10,

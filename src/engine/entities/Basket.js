@@ -81,7 +81,7 @@ export class Basket {
       ctx.translate(-this.x, -(this.y + this.depth / 2));
     }
 
-    // Inner fill
+    // Inner fill (darker for depth)
     ctx.beginPath();
     ctx.moveTo(this.x - hw, this.y);
     ctx.lineTo(this.x - hw, this.y + this.depth);
@@ -91,17 +91,53 @@ export class Basket {
     ctx.fillStyle = theme.basketFill;
     ctx.fill();
 
+    // NET PATTERN - diagonal cross-hatch lines
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(this.x - hw + 2, this.y + 2, hw * 2 - 4, this.depth - 4);
+    ctx.clip();
+
+    const netColor = theme.basketStroke;
+    ctx.strokeStyle = netColor;
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.4;
+
+    const spacing = 12;
+    const startX = this.x - hw;
+    const endX = this.x + hw;
+    const startY = this.y;
+    const endY = this.y + this.depth;
+
+    // Diagonal lines going down-right
+    for (let i = -this.depth; i < hw * 2 + this.depth; i += spacing) {
+      ctx.beginPath();
+      ctx.moveTo(startX + i, startY);
+      ctx.lineTo(startX + i + this.depth, endY);
+      ctx.stroke();
+    }
+
+    // Diagonal lines going down-left
+    for (let i = -this.depth; i < hw * 2 + this.depth; i += spacing) {
+      ctx.beginPath();
+      ctx.moveTo(endX - i, startY);
+      ctx.lineTo(endX - i - this.depth, endY);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
     // Shadow
     ctx.beginPath();
     ctx.moveTo(this.x - hw + 2, this.y + 3);
     ctx.lineTo(this.x - hw + 2, this.y + this.depth + 3);
     ctx.lineTo(this.x + hw + 2, this.y + this.depth + 3);
     ctx.lineTo(this.x + hw + 2, this.y + 3);
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.12)';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // Body
+    // Body outline (U-shape)
     ctx.beginPath();
     ctx.moveTo(this.x - hw, this.y);
     ctx.lineTo(this.x - hw, this.y + this.depth);
@@ -113,25 +149,37 @@ export class Basket {
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // Inner highlight
+    // RIM - thick top edge with glow (like basketball hoop)
+    ctx.shadowColor = theme.basketStroke;
+    ctx.shadowBlur = 8;
     ctx.beginPath();
-    ctx.moveTo(this.x - hw + 3, this.y + 3);
-    ctx.lineTo(this.x - hw + 3, this.y + this.depth - 3);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = 1.5;
+    ctx.moveTo(this.x - hw - 4, this.y);
+    ctx.lineTo(this.x + hw + 4, this.y);
+    ctx.strokeStyle = theme.basketRim;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Inner rim highlight
+    ctx.beginPath();
+    ctx.moveTo(this.x - hw + 2, this.y + 2);
+    ctx.lineTo(this.x + hw - 2, this.y + 2);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Lid
+    // Lid (barrier that opens)
     if (this.lidOpenProgress < 1) {
       const lidY = this.y - this.lidOpenProgress * 15;
       const lidAlpha = 1 - this.lidOpenProgress;
 
       ctx.globalAlpha = lidAlpha;
       ctx.shadowColor = theme.basketLidGlow;
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 12;
       ctx.beginPath();
-      ctx.moveTo(this.x - hw, lidY);
-      ctx.lineTo(this.x + hw, lidY);
+      ctx.moveTo(this.x - hw - 2, lidY);
+      ctx.lineTo(this.x + hw + 2, lidY);
       ctx.strokeStyle = theme.basketLid;
       ctx.lineWidth = 4;
       ctx.stroke();

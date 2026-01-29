@@ -292,9 +292,9 @@ export class Shape {
     const handle = this.getRotateHandlePos();
 
     // Handle appearance based on selection state
-    // Selected: bright (100% opacity), larger (10px radius)
-    // Not selected: dimmed (40% opacity), smaller (6px radius)
-    const radius = this.isSelected ? 10 : 6;
+    // Selected: bright (100% opacity), larger (12px radius)
+    // Not selected: dimmed (40% opacity), smaller (8px radius)
+    const radius = this.isSelected ? 12 : 8;
     const opacity = this.isSelected ? 1.0 : 0.4;
 
     ctx.save();
@@ -314,10 +314,37 @@ export class Shape {
     // Draw handle circle
     ctx.beginPath();
     ctx.arc(handle.x, handle.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = this.isSelected ? 'rgba(124, 92, 255, 0.3)' : 'rgba(71, 85, 105, 0.4)';
+    ctx.fillStyle = this.isSelected ? 'rgba(0, 245, 255, 0.2)' : 'rgba(71, 85, 105, 0.4)';
     ctx.fill();
     ctx.strokeStyle = this.isSelected ? theme.shapeSelectedAccent : theme.textMuted;
     ctx.lineWidth = this.isSelected ? 2.5 : 1.5;
+    ctx.stroke();
+
+    // Draw rotation arrow inside the handle
+    const arrowRadius = radius * 0.55;
+    const arrowStroke = this.isSelected ? theme.shapeSelectedAccent : theme.textMuted;
+
+    ctx.strokeStyle = arrowStroke;
+    ctx.lineWidth = this.isSelected ? 2 : 1.5;
+    ctx.lineCap = 'round';
+
+    // Draw circular arrow (arc + arrowhead)
+    ctx.beginPath();
+    // Arc from ~7 o'clock to ~1 o'clock (270deg sweep)
+    ctx.arc(handle.x, handle.y, arrowRadius, Math.PI * 0.7, Math.PI * 2.3);
+    ctx.stroke();
+
+    // Arrowhead at the end of arc (pointing clockwise)
+    const arrowTipAngle = Math.PI * 2.3;
+    const tipX = handle.x + Math.cos(arrowTipAngle) * arrowRadius;
+    const tipY = handle.y + Math.sin(arrowTipAngle) * arrowRadius;
+    const arrowSize = this.isSelected ? 4 : 3;
+
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX - arrowSize, tipY - arrowSize * 1.2);
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX + arrowSize * 0.8, tipY - arrowSize * 0.8);
     ctx.stroke();
 
     ctx.restore();
