@@ -30,7 +30,7 @@ Aşağıdaki dosyalar **orijinal halinde** korunuyor (sadece bug fix'ler):
 
 ## Commit History
 
-### 6814a4a - Fix remove mode hint text size and position
+### e7b3a45 - Fix remove mode hint text size and position
 **Tarih:** 2026-02-01
 **Değişiklikler:**
 - Remove hint text boyutu angle adjust ile aynı (`L.controlBoxFontSize` = 20px)
