@@ -246,17 +246,32 @@ export default function GameCanvas() {
     // ===== VFX =====
     go.vfx.draw(ctx);
 
-    // ===== ONE-WAY TUTORIAL =====
-    if (state.tutorialActive) {
-      drawOneWayTutorial(ctx, w, h, T);
+    // ===== BOTTOM CONTROLS =====
+    const powerupY = h - L.powerupAreaHeight;
+    const bottomOffset = (L.bottomControlsHeight + L.powerupAreaHeight) * (1 - animEase);
+
+    ctx.save();
+    ctx.translate(0, bottomOffset);
+
+    drawBottomControls(ctx, w, h, state, go, T, L);
+    drawPowerupArea(ctx, w, h, state, T, L, powerupY);
+
+    ctx.restore();
+
+    // ===== REMOVE MODE OVERLAY (after bottom controls to cover them) =====
+    // Animate tint alpha
+    if (state.selectRemoveTargetMode) {
+      go.removeModeAlpha = Math.min(1, go.removeModeAlpha + 0.08);
+    } else {
+      go.removeModeAlpha = Math.max(0, go.removeModeAlpha - 0.12);
     }
 
-    // ===== REMOVE MODE OVERLAY =====
-    if (state.selectRemoveTargetMode) {
-      // Dark tint over everything except powerup area
-      const powerupTop = h - LAYOUT.powerupAreaHeight;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-      ctx.fillRect(0, 0, w, powerupTop);
+    if (go.removeModeAlpha > 0) {
+      const tintAlpha = go.removeModeAlpha * 0.65;
+
+      // Dark tint over ENTIRE screen
+      ctx.fillStyle = `rgba(0, 0, 0, ${tintAlpha})`;
+      ctx.fillRect(0, 0, w, h);
 
       // Re-draw shapes above tint with pulsing red glow
       // Pre-calculate pulse values once (avoid recalculating sin() per shape)
@@ -269,7 +284,7 @@ export default function GameCanvas() {
         if (!s.isVisible()) return;
 
         ctx.save();
-        ctx.globalAlpha = s.opacity != null ? s.opacity : 1;
+        ctx.globalAlpha = (s.opacity != null ? s.opacity : 1) * go.removeModeAlpha;
 
         // Pulsing red glow - use pre-calculated values
         ctx.shadowColor = shadowColorStr;
@@ -297,24 +312,21 @@ export default function GameCanvas() {
       });
 
       // Hint text
+      ctx.save();
+      ctx.globalAlpha = go.removeModeAlpha;
       ctx.font = `700 ${16 * SIZE_SCALE}px Nunito, sans-serif`;
       ctx.fillStyle = '#f87171';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('Tap an object to remove', w / 2, powerupTop - 30);
+      const hintY = h - L.powerupAreaHeight - 30;
+      ctx.fillText('Tap an object to remove', w / 2, hintY);
+      ctx.restore();
     }
 
-    // ===== BOTTOM CONTROLS =====
-    const powerupY = h - L.powerupAreaHeight;
-    const bottomOffset = (L.bottomControlsHeight + L.powerupAreaHeight) * (1 - animEase);
-
-    ctx.save();
-    ctx.translate(0, bottomOffset);
-
-    drawBottomControls(ctx, w, h, state, go, T, L);
-    drawPowerupArea(ctx, w, h, state, T, L, powerupY);
-
-    ctx.restore();
+    // ===== ONE-WAY TUTORIAL (drawn last to cover everything) =====
+    if (state.tutorialActive) {
+      drawOneWayTutorial(ctx, w, h, T);
+    }
 
     // End screen shake
     ctx.restore();

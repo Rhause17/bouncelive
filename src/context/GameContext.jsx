@@ -250,6 +250,8 @@ export function GameProvider({ children }) {
     wasCanSubmit: false,
     replaySwooshTime: 0,
     prevState: 'edit',
+    removeModeAlpha: 0,
+    pieceHintAlpha: 1,
 
     // Basket widen animation
     basketOriginalRadius: null,
