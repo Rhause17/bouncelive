@@ -11,10 +11,11 @@ const THEME = getTheme('arcadeDark');
 
 export default function GameCanvas() {
   const canvasRef = useRef(null);
-  const { state, dispatch, gameObjects, setupLevel, submit, nextLevel } = useGame();
+  const { state, dispatch, gameObjects, setupLevel, submit, nextLevel, invalidateTrajectory } = useGame();
   const { width, height } = useCanvasSize();
   const patternCanvasRef = useRef(null);
   const lastTapTimeRef = useRef(0); // For double-tap detection
+  const gradientCacheRef = useRef({ width: 0, height: 0 }); // Cached gradients for performance
 
   // Create background dot pattern once
   useEffect(() => {
@@ -28,6 +29,46 @@ export default function GameCanvas() {
     pctx.fill();
     patternCanvasRef.current = pc;
   }, []);
+
+  // Cache gradients when canvas size changes (MAJOR performance optimization)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || width === 0 || height === 0) return;
+
+    const ctx = canvas.getContext('2d');
+    const cache = gradientCacheRef.current;
+    const T = THEME;
+    const L = LAYOUT;
+
+    // Only rebuild if size changed
+    if (cache.width === width && cache.height === height) return;
+    cache.width = width;
+    cache.height = height;
+
+    // Background gradient
+    const bgGrad = ctx.createLinearGradient(0, 0, width * 0.3, height);
+    bgGrad.addColorStop(0, T.bgGradientStart);
+    bgGrad.addColorStop(0.5, T.bgGradientMid);
+    bgGrad.addColorStop(1, T.bgGradientEnd);
+    cache.bgGradient = bgGrad;
+
+    // Vignette gradient
+    const vignetteGrad = ctx.createRadialGradient(width / 2, height / 2, height * 0.5, width / 2, height / 2, height);
+    vignetteGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vignetteGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+    cache.vignetteGradient = vignetteGrad;
+
+    // Top panel gradient
+    const panelGrad = ctx.createLinearGradient(0, 0, 0, L.levelDataAreaHeight);
+    panelGrad.addColorStop(0, T.panelTopStart);
+    panelGrad.addColorStop(1, T.panelTopEnd);
+    cache.panelGradient = panelGrad;
+
+    // Pattern (create once)
+    if (patternCanvasRef.current) {
+      cache.pattern = ctx.createPattern(patternCanvasRef.current, 'repeat');
+    }
+  }, [width, height]);
 
   // Clear game objects when returning to welcome
   useEffect(() => {
@@ -67,37 +108,39 @@ export default function GameCanvas() {
       ctx.translate(go.vfx.screenShake.x, go.vfx.screenShake.y);
     }
 
-    // Background
-    const bgGradient = ctx.createLinearGradient(0, 0, w * 0.3, h);
-    bgGradient.addColorStop(0, T.bgGradientStart);
-    bgGradient.addColorStop(0.5, T.bgGradientMid);
-    bgGradient.addColorStop(1, T.bgGradientEnd);
-    ctx.fillStyle = bgGradient;
-    ctx.fillRect(0, 0, w, h);
-
-    // Dot pattern
-    if (patternCanvasRef.current) {
-      const pattern = ctx.createPattern(patternCanvasRef.current, 'repeat');
-      ctx.fillStyle = pattern;
+    // Background (use cached gradient)
+    const cache = gradientCacheRef.current;
+    if (cache.bgGradient) {
+      ctx.fillStyle = cache.bgGradient;
+      ctx.fillRect(0, 0, w, h);
+    } else {
+      ctx.fillStyle = T.bgGradientStart;
       ctx.fillRect(0, 0, w, h);
     }
 
-    // Vignette
-    const vignetteGrad = ctx.createRadialGradient(w / 2, h / 2, h * 0.5, w / 2, h / 2, h);
-    vignetteGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    vignetteGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
-    ctx.fillStyle = vignetteGrad;
-    ctx.fillRect(0, 0, w, h);
+    // Dot pattern (use cached pattern)
+    if (cache.pattern) {
+      ctx.fillStyle = cache.pattern;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    // Vignette (use cached gradient)
+    if (cache.vignetteGradient) {
+      ctx.fillStyle = cache.vignetteGradient;
+      ctx.fillRect(0, 0, w, h);
+    }
 
     // ===== TOP PANEL =====
     const topOffset = L.levelDataAreaHeight * (1 - animEase) + go.hudStateOffset;
     ctx.save();
     ctx.translate(0, -topOffset);
 
-    const panelGrad = ctx.createLinearGradient(0, 0, 0, L.levelDataAreaHeight);
-    panelGrad.addColorStop(0, T.panelTopStart);
-    panelGrad.addColorStop(1, T.panelTopEnd);
-    ctx.fillStyle = panelGrad;
+    // Use cached panel gradient or solid color fallback
+    if (cache.panelGradient) {
+      ctx.fillStyle = cache.panelGradient;
+    } else {
+      ctx.fillStyle = T.panelTopStart;
+    }
     ctx.fillRect(0, 0, w, L.levelDataAreaHeight);
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
@@ -183,14 +226,18 @@ export default function GameCanvas() {
     // ===== BASKET =====
     go.basket.draw(ctx, T);
 
-    // ===== TRAJECTORY =====
+    // ===== TRAJECTORY (cached for performance) =====
     if (state.gameState === 'edit' && state.allShapesPlaced) {
-      const traj = predictTrajectory(
-        go.physics, go.shapes, go.basket,
-        go.ballSpawnX, go.ballUpperLimit,
-        state.trajectoryExtended, w, h,
-      );
-      drawTrajectory(ctx, traj, go.time, state.trajectoryExtended, T);
+      // Only recalculate trajectory when invalidated
+      if (!go.trajectoryValid || !go.cachedTrajectory) {
+        go.cachedTrajectory = predictTrajectory(
+          go.physics, go.shapes, go.basket,
+          go.ballSpawnX, go.ballUpperLimit,
+          state.trajectoryExtended, w, h,
+        );
+        go.trajectoryValid = true;
+      }
+      drawTrajectory(ctx, go.cachedTrajectory, go.time, state.trajectoryExtended, T);
     }
 
     // ===== BALL =====
@@ -329,6 +376,7 @@ export default function GameCanvas() {
           shape.removedByPowerup = true;
           shape.startDisappear();
           dispatch({ type: 'REMOVE_SHAPE' });
+          invalidateTrajectory(); // Recalculate trajectory after shape removal
           return;
         }
       }
@@ -432,6 +480,7 @@ export default function GameCanvas() {
       shape.hasBeenMoved = true;
       shape.clampToCanvas(canvas.width, canvas.height, go.basketLineY);
       updateCanSubmit(go, dispatch, state);
+      invalidateTrajectory(); // Recalculate trajectory on shape move
     }
 
     if (ds.isRotating && ds.shapeIndex >= 0) {
@@ -442,6 +491,7 @@ export default function GameCanvas() {
       // Only apply rotation if it doesn't cause overlap (5px gap)
       if (!shape.wouldOverlapAtRotation(newRotation, go.shapes, 5)) {
         shape.rotation = newRotation;
+        invalidateTrajectory(); // Recalculate trajectory on shape rotate
       }
       // If overlap would occur, rotation stays at last valid angle
     }
@@ -454,9 +504,10 @@ export default function GameCanvas() {
       // Only apply rotation if it doesn't cause overlap (5px gap)
       if (!shape.wouldOverlapAtRotation(newRotation, go.shapes, 5)) {
         shape.rotation = newRotation;
+        invalidateTrajectory(); // Recalculate trajectory on angle swipe
       }
     }
-  }, [state, gameObjects, dispatch, getCanvasCoords]);
+  }, [state, gameObjects, dispatch, getCanvasCoords, invalidateTrajectory]);
 
   const handlePointerUp = useCallback(() => {
     const ds = dragState.current;
@@ -539,10 +590,7 @@ function drawLivesPill(ctx, state, go, T, L) {
   ctx.shadowOffsetY = 3;
 
   Utils.roundRect(ctx, x, y, L.movesBoxWidth, L.movesBoxHeight, L.boxCornerRadius);
-  const grad = ctx.createLinearGradient(x, y, x, y + L.movesBoxHeight);
-  grad.addColorStop(0, pillStart);
-  grad.addColorStop(1, pillEnd);
-  ctx.fillStyle = grad;
+  ctx.fillStyle = pillStart; // Solid color for performance
   ctx.fill();
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
@@ -574,10 +622,7 @@ function drawSpecsBox(ctx, canvasW, state, T, L) {
   ctx.shadowOffsetY = 2;
 
   Utils.roundRect(ctx, x, y, L.specsBoxWidth, L.specsBoxHeight, L.boxCornerRadius);
-  const grad = ctx.createLinearGradient(x, y, x, y + L.specsBoxHeight);
-  grad.addColorStop(0, T.specsPillStart);
-  grad.addColorStop(1, T.specsPillEnd);
-  ctx.fillStyle = grad;
+  ctx.fillStyle = T.specsPillStart; // Solid color for performance
   ctx.fill();
   ctx.shadowBlur = 0;
 
@@ -597,10 +642,7 @@ function drawSpecsBox(ctx, canvasW, state, T, L) {
 }
 
 function drawBottomControls(ctx, w, h, state, go, T, L) {
-  const bottomPanelGrad = ctx.createLinearGradient(0, go.bottomControlsY, 0, go.bottomControlsY + L.bottomControlsHeight);
-  bottomPanelGrad.addColorStop(0, T.panelBottomStart);
-  bottomPanelGrad.addColorStop(1, T.panelBottomEnd);
-  ctx.fillStyle = bottomPanelGrad;
+  ctx.fillStyle = T.panelBottomStart; // Solid color for performance
   ctx.fillRect(0, go.bottomControlsY, w, L.bottomControlsHeight);
 
   ctx.fillStyle = T.panelBottomStroke;
@@ -623,10 +665,7 @@ function drawBottomControls(ctx, w, h, state, go, T, L) {
 
   if (state.selectedShapeIndex >= 0 && state.allShapesPlaced) {
     const shape = go.shapes[state.selectedShapeIndex];
-    const agGrad = ctx.createLinearGradient(angleBox.x, angleBox.y, angleBox.x, angleBox.y + angleBox.h);
-    agGrad.addColorStop(0, T.angleChipActiveStart);
-    agGrad.addColorStop(1, T.angleChipActiveEnd);
-    ctx.fillStyle = agGrad;
+    ctx.fillStyle = T.angleChipActiveStart; // Solid color for performance
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.strokeStyle = T.angleChipActiveStroke;
@@ -647,10 +686,7 @@ function drawBottomControls(ctx, w, h, state, go, T, L) {
 
     drawBidirectionalArrow(ctx, angleBox.x + angleBox.w / 2, angleBox.y + angleBox.h / 2 + 10, 20, T.angleChipActiveText || T.secondary, 1);
   } else {
-    const agGrad = ctx.createLinearGradient(angleBox.x, angleBox.y, angleBox.x, angleBox.y + angleBox.h);
-    agGrad.addColorStop(0, T.angleChipStart);
-    agGrad.addColorStop(1, T.angleChipEnd);
-    ctx.fillStyle = agGrad;
+    ctx.fillStyle = T.angleChipStart; // Solid color for performance
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.strokeStyle = T.angleChipStroke;
@@ -692,10 +728,7 @@ function drawBottomControls(ctx, w, h, state, go, T, L) {
   Utils.roundRect(ctx, submitBox.x, submitBox.y, submitBox.w, submitBox.h, L.controlCornerRadius);
 
   if (state.canSubmit) {
-    const btnGrad = ctx.createLinearGradient(submitBox.x, submitBox.y, submitBox.x, submitBox.y + submitBox.h);
-    btnGrad.addColorStop(0, T.submitStart);
-    btnGrad.addColorStop(1, T.submitEnd);
-    ctx.fillStyle = btnGrad;
+    ctx.fillStyle = T.submitStart; // Solid color for performance
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
@@ -708,10 +741,7 @@ function drawBottomControls(ctx, w, h, state, go, T, L) {
     ctx.textBaseline = 'middle';
     ctx.fillText('SUBMIT', submitBox.x + submitBox.w / 2, submitBox.y + submitBox.h / 2);
   } else {
-    const dGrad = ctx.createLinearGradient(submitBox.x, submitBox.y, submitBox.x, submitBox.y + submitBox.h);
-    dGrad.addColorStop(0, T.submitDisabledStart);
-    dGrad.addColorStop(1, T.submitDisabledEnd);
-    ctx.fillStyle = dGrad;
+    ctx.fillStyle = T.submitDisabledStart; // Solid color for performance
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.font = `700 ${L.controlBoxFontSize}px Nunito, sans-serif`;
@@ -724,10 +754,7 @@ function drawBottomControls(ctx, w, h, state, go, T, L) {
 }
 
 function drawPowerupArea(ctx, w, h, state, T, L, powerupY) {
-  const powerupPanelGrad = ctx.createLinearGradient(0, powerupY, 0, powerupY + L.powerupAreaHeight);
-  powerupPanelGrad.addColorStop(0, T.panelPowerupStart);
-  powerupPanelGrad.addColorStop(1, T.panelPowerupEnd);
-  ctx.fillStyle = powerupPanelGrad;
+  ctx.fillStyle = T.panelPowerupStart; // Solid color for performance
   ctx.fillRect(0, powerupY, w, L.powerupAreaHeight);
 
   ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
@@ -747,10 +774,7 @@ function drawPowerupArea(ctx, w, h, state, T, L, powerupY) {
     const bx = spacing + i * (btnSize + spacing);
 
     Utils.roundRect(ctx, bx, btnY, btnSize, btnSize, L.boxCornerRadius);
-    const grad = ctx.createLinearGradient(bx, btnY, bx, btnY + btnSize);
-    grad.addColorStop(0, btn.start);
-    grad.addColorStop(1, btn.end);
-    ctx.fillStyle = grad;
+    ctx.fillStyle = btn.start; // Solid color for performance
     ctx.fill();
 
     ctx.strokeStyle = btn.stroke;

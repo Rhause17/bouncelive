@@ -37,6 +37,6 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: false // Disabled for better mobile performance
   }
 })

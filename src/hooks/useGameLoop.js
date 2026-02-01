@@ -83,6 +83,7 @@ export function useGameLoop({ gameObjects, state, dispatch, onDraw }) {
       const eased = 1 - Math.pow(1 - go.basketWidenProgress, 3);
       const targetRadius = go.basketOriginalRadius * 1.30;
       go.basket.radius = go.basketOriginalRadius + (targetRadius - go.basketOriginalRadius) * eased;
+      go.trajectoryValid = false; // Invalidate trajectory when basket size changes
     }
 
     // Update VFX

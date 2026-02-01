@@ -254,6 +254,10 @@ export function GameProvider({ children }) {
     // Basket widen animation
     basketOriginalRadius: null,
     basketWidenProgress: 1,
+
+    // Trajectory cache (invalidated on shape/basket changes)
+    cachedTrajectory: null,
+    trajectoryValid: false,
   });
 
   const setupLevel = useCallback((levelNum, canvasWidth, canvasHeight) => {
@@ -269,6 +273,8 @@ export function GameProvider({ children }) {
     go.hudAnimProgress = 0;
     go.basketWidenProgress = 1;
     go.basketOriginalRadius = null;
+    go.cachedTrajectory = null;
+    go.trajectoryValid = false;
 
     const w = canvasWidth;
     const h = canvasHeight;
@@ -458,6 +464,11 @@ export function GameProvider({ children }) {
     setupLevel(state.level + 1, canvasWidth, canvasHeight);
   }, [state.level, setupLevel]);
 
+  // Invalidate trajectory cache (call when shapes move/rotate or basket changes)
+  const invalidateTrajectory = useCallback(() => {
+    gameObjects.current.trajectoryValid = false;
+  }, []);
+
   const value = {
     state,
     dispatch,
@@ -466,6 +477,7 @@ export function GameProvider({ children }) {
     submit,
     returnToEdit,
     nextLevel,
+    invalidateTrajectory,
   };
 
   return (

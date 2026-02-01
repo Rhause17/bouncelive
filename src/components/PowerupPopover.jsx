@@ -30,7 +30,7 @@ const POWERUP_CONFIG = {
 };
 
 export default function PowerupPopover({ type, onClose, onEnterRemoveMode }) {
-  const { state, dispatch, gameObjects } = useGame();
+  const { state, dispatch, gameObjects, invalidateTrajectory } = useGame();
   const popoverRef = useRef(null);
 
   const config = POWERUP_CONFIG[type];
@@ -58,6 +58,9 @@ export default function PowerupPopover({ type, onClose, onEnterRemoveMode }) {
       }
       go.basketWidenProgress = 0;
     }
+
+    // Invalidate trajectory cache when powerup changes game state
+    invalidateTrajectory();
 
     onClose();
   };
