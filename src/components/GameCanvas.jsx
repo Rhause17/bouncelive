@@ -329,15 +329,27 @@ export default function GameCanvas() {
         ctx.restore();
       });
 
-      // Hint text
+      // Hint text - same size as angle adjust, positioned above bottom controls
       ctx.save();
       ctx.globalAlpha = go.removeModeAlpha;
-      ctx.font = `700 ${16 * SIZE_SCALE}px Nunito, sans-serif`;
+
+      // Use controlBoxFontSize to match angle adjust text
+      const hintText = 'Tap an object to remove';
+      let fontSize = L.controlBoxFontSize;
+
+      // Ensure single line - measure and reduce if needed
+      ctx.font = `700 ${fontSize}px Nunito, sans-serif`;
+      while (ctx.measureText(hintText).width > w - 40 && fontSize > 12) {
+        fontSize -= 1;
+        ctx.font = `700 ${fontSize}px Nunito, sans-serif`;
+      }
+
       ctx.fillStyle = '#f87171';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const hintY = h - L.powerupAreaHeight - 30;
-      ctx.fillText('Tap an object to remove', w / 2, hintY);
+      // Position slightly above the bottom controls area
+      const hintY = go.bottomControlsY - 20;
+      ctx.fillText(hintText, w / 2, hintY);
       ctx.restore();
     }
 

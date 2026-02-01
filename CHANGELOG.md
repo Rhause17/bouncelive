@@ -30,6 +30,18 @@ Aşağıdaki dosyalar **orijinal halinde** korunuyor (sadece bug fix'ler):
 
 ## Commit History
 
+### 6814a4a - Fix remove mode hint text size and position
+**Tarih:** 2026-02-01
+**Değişiklikler:**
+- Remove hint text boyutu angle adjust ile aynı (`L.controlBoxFontSize` = 20px)
+- Pozisyon: bottom controls'un hemen üstü (`go.bottomControlsY - 20`)
+- Tek satır garantisi: `measureText` ile kontrol, gerekirse font küçültülüyor
+
+**Dosyalar:**
+- `src/components/GameCanvas.jsx`
+
+---
+
 ### c28ebcd - Restore level 1 piece area hint text with fade animation
 **Tarih:** 2026-02-01
 **Değişiklikler:**
