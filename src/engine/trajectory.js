@@ -170,29 +170,53 @@ export function drawTrajectory(ctx, trajectory, time, trajectoryExtended, theme)
     return MAX_ALPHA * smoothstep(FADE_END, FADE_START, timeProgress);
   };
 
-  // Dots
+  // Calculate total trajectory length for even dot distribution
+  let totalLength = 0;
+  const segmentLengths = [];
   for (let i = 0; i < points.length - 1; i++) {
     const p1 = points[i], p2 = points[i + 1];
-    const segLength = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
-    const time1 = p1.time || 0;
-    const time2 = p2.time || time1 + 0.01;
-    const numDots = Math.floor(segLength / ANIM.trajectoryDotSpacing);
+    const len = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+    segmentLengths.push(len);
+    totalLength += len;
+  }
 
-    for (let j = 0; j <= numDots; j++) {
-      const t = j / Math.max(1, numDots);
-      const x = p1.x + (p2.x - p1.x) * t;
-      const y = p1.y + (p2.y - p1.y) * t;
-      const interpolatedTime = time1 + (time2 - time1) * t;
-      const progress = interpolatedTime / maxTime;
-      const alpha = getFadeAlpha(progress);
-      if (alpha < 0.01) continue;
+  // Place dots at fixed intervals along total trajectory length
+  const dotSpacing = ANIM.trajectoryDotSpacing;
+  const numDots = Math.floor(totalLength / dotSpacing);
 
-      const size = Math.max(1.5, 3 * (1 - progress * 0.5));
-      ctx.beginPath();
-      ctx.arc(x, y, size, 0, Math.PI * 2);
-      ctx.fillStyle = theme.trajectoryStart;
-      ctx.globalAlpha = alpha;
-      ctx.fill();
+  for (let d = 0; d <= numDots; d++) {
+    const targetDist = d * dotSpacing;
+
+    // Find which segment this distance falls into
+    let accumDist = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+      const segLen = segmentLengths[i];
+      if (accumDist + segLen >= targetDist || i === points.length - 2) {
+        // This segment contains the target distance
+        const p1 = points[i], p2 = points[i + 1];
+        const localDist = targetDist - accumDist;
+        const t = segLen > 0 ? Math.min(1, localDist / segLen) : 0;
+
+        const x = p1.x + (p2.x - p1.x) * t;
+        const y = p1.y + (p2.y - p1.y) * t;
+
+        const time1 = p1.time || 0;
+        const time2 = p2.time || time1 + 0.01;
+        const interpolatedTime = time1 + (time2 - time1) * t;
+        const progress = interpolatedTime / maxTime;
+        const alpha = getFadeAlpha(progress);
+
+        if (alpha >= 0.01) {
+          const size = Math.max(1.5, 3 * (1 - progress * 0.5));
+          ctx.beginPath();
+          ctx.arc(x, y, size, 0, Math.PI * 2);
+          ctx.fillStyle = theme.trajectoryStart;
+          ctx.globalAlpha = alpha;
+          ctx.fill();
+        }
+        break;
+      }
+      accumDist += segLen;
     }
   }
   ctx.globalAlpha = 1;
