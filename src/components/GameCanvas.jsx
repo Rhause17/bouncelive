@@ -205,6 +205,24 @@ export default function GameCanvas() {
       ctx.setLineDash([8, 6]);
       ctx.stroke();
       ctx.setLineDash([]);
+
+      // Hint text above piece area - only on level 1, fades when piece moved
+      if (state.level === 1 && go.pieceHintAlpha > 0) {
+        // Fade out when any piece has been moved
+        const anyMoved = go.shapes.some(s => s.hasBeenMoved);
+        if (anyMoved && go.pieceHintAlpha > 0) {
+          go.pieceHintAlpha = Math.max(0, go.pieceHintAlpha - 0.05);
+        }
+
+        ctx.save();
+        ctx.globalAlpha = go.pieceHintAlpha;
+        ctx.font = `700 ${L.controlBoxFontSize * 0.85}px Nunito, sans-serif`;
+        ctx.fillStyle = T.textSecondary;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('Place objects to submit', w / 2, go.pieceAreaY - 10);
+        ctx.restore();
+      }
     }
 
     // ===== BASKET LINE =====
