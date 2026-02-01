@@ -221,50 +221,6 @@ export function drawTrajectory(ctx, trajectory, time, trajectoryExtended, theme)
   }
   ctx.globalAlpha = 1;
 
-  // Direction ticks
-  let lastTickDist = 0;
-  let accumulatedDist = 0;
-  for (let i = 0; i < points.length - 1; i++) {
-    const p1 = points[i], p2 = points[i + 1];
-    const dx = p2.x - p1.x, dy = p2.y - p1.y;
-    const segLength = Math.sqrt(dx * dx + dy * dy);
-    const angle = Math.atan2(dy, dx);
-    const time1 = p1.time || 0;
-    const time2 = p2.time || time1 + 0.01;
-
-    let segDist = 0;
-    while (segDist < segLength) {
-      const distFromStart = accumulatedDist + segDist;
-      if (distFromStart - lastTickDist >= ANIM.trajectoryTickSpacing && distFromStart > 20) {
-        const t = segDist / segLength;
-        const x = p1.x + dx * t;
-        const y = p1.y + dy * t;
-        const interpolatedTime = time1 + (time2 - time1) * t;
-        const progress = interpolatedTime / maxTime;
-        const alpha = getFadeAlpha(progress) * 0.7;
-
-        if (alpha >= 0.01) {
-          ctx.save();
-          ctx.translate(x, y);
-          ctx.rotate(angle);
-          ctx.beginPath();
-          ctx.moveTo(ANIM.trajectoryTickSize, 0);
-          ctx.lineTo(-ANIM.trajectoryTickSize * 0.5, -ANIM.trajectoryTickSize * 0.6);
-          ctx.lineTo(-ANIM.trajectoryTickSize * 0.5, ANIM.trajectoryTickSize * 0.6);
-          ctx.closePath();
-          ctx.fillStyle = theme.trajectoryTick;
-          ctx.globalAlpha = alpha;
-          ctx.fill();
-          ctx.restore();
-        }
-        lastTickDist = distFromStart;
-      }
-      segDist += ANIM.trajectoryTickSpacing;
-    }
-    accumulatedDist += segLength;
-  }
-  ctx.globalAlpha = 1;
-
   // Impact marker
   if (trajectory.hitPoint) {
     const pulse = 0.5 + Math.sin(time * ANIM.trajectoryPulseSpeed * Math.PI) * 0.5;
