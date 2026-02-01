@@ -4,6 +4,9 @@ import { Utils } from './utils.js';
 /**
  * Ghost simulation for trajectory prediction.
  * Uses exact same physics as runtime to ensure preview matches actual ball behavior.
+ *
+ * Key principle: Only sample positions from the simulation - don't try to calculate
+ * collision points analytically. This ensures the trajectory matches actual ball behavior.
  */
 export function predictTrajectory(physics, shapes, basket, ballSpawnX, ballUpperLimit, trajectoryExtended, canvasWidth, canvasHeight) {
   const ballRadius = 15 * SIZE_SCALE;
@@ -18,21 +21,25 @@ export function predictTrajectory(physics, shapes, basket, ballSpawnX, ballUpper
   const maxTime = trajectoryExtended ? 2.5 : 1.25;
   const maxBounces = 10;
 
-  let hitPoint = null;
   let reboundPoints = [];
   let bounceCount = 0;
   let totalTime = 0;
+  let willVanish = false;
 
-  const MIN_SAMPLE_DIST = 6;
+  const MIN_SAMPLE_DIST = 4; // Smaller for smoother curve
   let lastSampleX = ghost.x;
   let lastSampleY = ghost.y;
 
-  reboundPoints.push({ x: ghost.x, y: ghost.y, time: 0, kind: 'start' });
+  reboundPoints.push({ x: ghost.x, y: ghost.y, time: 0 });
 
   while (totalTime < maxTime && bounceCount < maxBounces) {
     const subDt = dt / substeps;
 
     for (let sub = 0; sub < substeps; sub++) {
+      // Store position before physics step
+      const prevX = ghost.x;
+      const prevY = ghost.y;
+
       ghost.vy += gravity * subDt;
       ghost.x += ghost.vx * subDt;
       ghost.y += ghost.vy * subDt;
@@ -50,31 +57,10 @@ export function predictTrajectory(physics, shapes, basket, ballSpawnX, ballUpper
           const oneWayResult = Utils.evaluateOneWayCollision(shape, seg, segIdx, collision);
 
           if (oneWayResult.shouldVanish) {
-            const collPt = { x: collision.closest.x, y: collision.closest.y };
-
-            // Check if collision point is too close to last sample - if so, replace instead of add
-            // This prevents tiny "kink" segments at the end of trajectory
-            const lastPt = reboundPoints[reboundPoints.length - 1];
-            const distToLast = Math.sqrt((collPt.x - lastPt.x) ** 2 + (collPt.y - lastPt.y) ** 2);
-            const MIN_ENDPOINT_DIST = MIN_SAMPLE_DIST * 1.5; // 9px threshold
-
-            if (bounceCount === 0) {
-              hitPoint = { x: collPt.x, y: collPt.y, isVanish: true };
-              if (distToLast < MIN_ENDPOINT_DIST && reboundPoints.length > 1) {
-                // Replace last sample with collision point
-                reboundPoints[reboundPoints.length - 1] = { x: collPt.x, y: collPt.y, time: totalTime, kind: 'vanish' };
-              } else {
-                reboundPoints.push({ x: collPt.x, y: collPt.y, time: totalTime, kind: 'vanish' });
-              }
-              return { hitPoint, reboundPoints, hitShape: true, maxSteps: reboundPoints.length, willVanish: true };
-            } else {
-              if (distToLast < MIN_ENDPOINT_DIST && reboundPoints.length > 1) {
-                reboundPoints[reboundPoints.length - 1] = { x: collPt.x, y: collPt.y, time: totalTime, kind: 'end' };
-              } else {
-                reboundPoints.push({ x: collPt.x, y: collPt.y, time: totalTime, kind: 'end' });
-              }
-              return { hitPoint, reboundPoints, hitShape: true, maxSteps: reboundPoints.length, willVanish: false };
-            }
+            // Sample final position before vanishing
+            reboundPoints.push({ x: ghost.x, y: ghost.y, time: totalTime });
+            willVanish = bounceCount === 0;
+            return { hitPoint: null, reboundPoints, hitShape: true, maxSteps: reboundPoints.length, willVanish };
           }
 
           ghost.x += collision.normal.x * collision.penetration;
@@ -88,35 +74,27 @@ export function predictTrajectory(physics, shapes, basket, ballSpawnX, ballUpper
             ghost.vx = reflection.vel.x;
             ghost.vy = reflection.vel.y;
 
-            const collPt = { x: collision.closest.x, y: collision.closest.y };
-            if (hitPoint === null) {
-              hitPoint = { x: collPt.x, y: collPt.y };
+            // Sample position right after collision (pushed out position)
+            const distFromLast = Math.sqrt((ghost.x - lastSampleX) ** 2 + (ghost.y - lastSampleY) ** 2);
+            if (distFromLast >= MIN_SAMPLE_DIST / 2) {
+              reboundPoints.push({ x: ghost.x, y: ghost.y, time: totalTime });
+              lastSampleX = ghost.x;
+              lastSampleY = ghost.y;
             }
 
-            // Check if collision point is too close to last sample - if so, replace instead of add
-            const lastPt = reboundPoints[reboundPoints.length - 1];
-            const distToLast = Math.sqrt((collPt.x - lastPt.x) ** 2 + (collPt.y - lastPt.y) ** 2);
-            const MIN_ENDPOINT_DIST = MIN_SAMPLE_DIST * 1.5;
-
-            if (distToLast < MIN_ENDPOINT_DIST && reboundPoints.length > 1) {
-              reboundPoints[reboundPoints.length - 1] = { x: collPt.x, y: collPt.y, time: totalTime, kind: 'collision' };
-            } else {
-              reboundPoints.push({ x: collPt.x, y: collPt.y, time: totalTime, kind: 'collision' });
-            }
-
-            lastSampleX = collPt.x;
-            lastSampleY = collPt.y;
             bounceCount++;
           }
         }
       }
 
+      // Check basket collision (only before first shape hit)
       if (bounceCount === 0 && basket) {
         for (const seg of basket.getSegments()) {
           const collision = Utils.resolveSegmentCollision(
             { x: ghost.x, y: ghost.y }, ghost.radius, seg,
           );
           if (collision) {
+            reboundPoints.push({ x: ghost.x, y: ghost.y, time: totalTime });
             return { hitPoint: null, reboundPoints, hitShape: false, maxSteps: reboundPoints.length };
           }
         }
@@ -125,9 +103,10 @@ export function predictTrajectory(physics, shapes, basket, ballSpawnX, ballUpper
 
     totalTime += dt;
 
+    // Regular sampling at fixed distance intervals
     const distFromLast = Math.sqrt((ghost.x - lastSampleX) ** 2 + (ghost.y - lastSampleY) ** 2);
     if (distFromLast >= MIN_SAMPLE_DIST) {
-      reboundPoints.push({ x: ghost.x, y: ghost.y, time: totalTime, kind: bounceCount === 0 ? 'pre' : 'post' });
+      reboundPoints.push({ x: ghost.x, y: ghost.y, time: totalTime });
       lastSampleX = ghost.x;
       lastSampleY = ghost.y;
     }
@@ -141,14 +120,15 @@ export function predictTrajectory(physics, shapes, basket, ballSpawnX, ballUpper
   }
 
   if (reboundPoints.length === 1) {
-    reboundPoints.push({ x: reboundPoints[0].x, y: reboundPoints[0].y + 20, time: 0.1, kind: 'pre' });
+    reboundPoints.push({ x: reboundPoints[0].x, y: reboundPoints[0].y + 20, time: 0.1 });
   }
 
-  return { hitPoint, reboundPoints, hitShape: bounceCount > 0 || hitPoint !== null, maxSteps: reboundPoints.length };
+  return { hitPoint: null, reboundPoints, hitShape: bounceCount > 0, maxSteps: reboundPoints.length };
 }
 
 /**
  * Draw trajectory preview on canvas.
+ * Uses even dot distribution along the total path length.
  */
 export function drawTrajectory(ctx, trajectory, time, trajectoryExtended, theme) {
   if (trajectory.reboundPoints.length < 2) return;
@@ -192,7 +172,6 @@ export function drawTrajectory(ctx, trajectory, time, trajectoryExtended, theme)
     for (let i = 0; i < points.length - 1; i++) {
       const segLen = segmentLengths[i];
       if (accumDist + segLen >= targetDist || i === points.length - 2) {
-        // This segment contains the target distance
         const p1 = points[i], p2 = points[i + 1];
         const localDist = targetDist - accumDist;
         const t = segLen > 0 ? Math.min(1, localDist / segLen) : 0;
@@ -220,40 +199,4 @@ export function drawTrajectory(ctx, trajectory, time, trajectoryExtended, theme)
     }
   }
   ctx.globalAlpha = 1;
-
-  // Impact marker
-  if (trajectory.hitPoint) {
-    const pulse = 0.5 + Math.sin(time * ANIM.trajectoryPulseSpeed * Math.PI) * 0.5;
-
-    if (trajectory.willVanish) {
-      const size = 10 + pulse * 3;
-      ctx.save();
-      ctx.translate(trajectory.hitPoint.x, trajectory.hitPoint.y);
-      ctx.rotate(Math.PI / 4);
-      ctx.strokeStyle = theme.oneWayHighlight;
-      ctx.lineWidth = 3;
-      ctx.globalAlpha = 0.8;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(-size, 0); ctx.lineTo(size, 0);
-      ctx.moveTo(0, -size); ctx.lineTo(0, size);
-      ctx.stroke();
-      ctx.restore();
-    } else {
-      const outerRadius = 8 + pulse * 4;
-      ctx.beginPath();
-      ctx.arc(trajectory.hitPoint.x, trajectory.hitPoint.y, outerRadius, 0, Math.PI * 2);
-      ctx.strokeStyle = theme.trajectoryImpactGlow;
-      ctx.lineWidth = 3;
-      ctx.globalAlpha = 0.3 + pulse * 0.3;
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(trajectory.hitPoint.x, trajectory.hitPoint.y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = theme.trajectoryImpact;
-      ctx.globalAlpha = 0.7;
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-  }
 }

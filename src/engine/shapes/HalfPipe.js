@@ -111,6 +111,9 @@ export class HalfPipe extends Shape {
     ctx.fillStyle = colors.fill;
     ctx.fill('evenodd');
 
+    // 3D Bevel overlay on outer shape
+    this.draw3DBevel(ctx, [v[0], v[1], v[2], v[3]]);
+
     if (this.hitHighlight > 0) {
       ctx.shadowColor = theme.shapeHitHighlight;
       ctx.shadowBlur = 25 * this.hitHighlight;

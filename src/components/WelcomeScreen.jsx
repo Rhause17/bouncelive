@@ -1,15 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useGame } from '../context/GameContext.jsx';
 
 export default function WelcomeScreen() {
   const { state, dispatch } = useGame();
+  const [isExiting, setIsExiting] = useState(false);
 
-  if (state.screen !== 'welcome') return null;
+  if (state.screen !== 'welcome' && !isExiting) return null;
 
   const displayHighest = state.highestCompletedLevel;
 
+  const handleStart = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      dispatch({ type: 'START_GAME' });
+      setIsExiting(false);
+    }, 400);
+  };
+
   return (
-    <div className="welcome-screen">
+    <div className={`welcome-screen ${isExiting ? 'exiting' : ''}`}>
       <div className="welcome-title-group">
         <h1 className="welcome-title">Solve the Bounce!</h1>
       </div>
@@ -33,7 +42,8 @@ export default function WelcomeScreen() {
         </div>
         <button
           className="start-btn"
-          onClick={() => dispatch({ type: 'START_GAME' })}
+          onClick={handleStart}
+          disabled={isExiting}
         >
           Start
         </button>

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useGame } from '../context/GameContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { IS_SAFARI } from '../engine/platform.js';
@@ -11,10 +11,61 @@ export default function WinOverlay() {
   const transitioningRef = useRef(false);
   const savedRef = useRef(false);
 
+  // Animation states
+  const [visibleStars, setVisibleStars] = useState(0);
+  const [showContent, setShowContent] = useState(false);
+  const [displayedLevel, setDisplayedLevel] = useState(1);
+
   const isWin = state.gameState === 'win';
   const isFail = state.gameState === 'fail';
   const livesRatio = isWin ? state.lives / state.initialLives : 0;
   const stars = livesRatio >= 0.7 ? 3 : livesRatio >= 0.4 ? 2 : 1;
+
+  // Staggered star animation on win + slot machine level counter
+  useEffect(() => {
+    if (isWin) {
+      setShowContent(false);
+      setVisibleStars(0);
+      setDisplayedLevel(1);
+
+      // Show content after brief delay
+      const contentTimer = setTimeout(() => setShowContent(true), 100);
+
+      // Stagger star reveals
+      const starTimers = [];
+      for (let i = 1; i <= stars; i++) {
+        starTimers.push(setTimeout(() => setVisibleStars(i), 300 + i * 300));
+      }
+
+      // Slot machine level counter effect
+      const targetLevel = state.level;
+      if (targetLevel > 1) {
+        let currentLevel = 1;
+        const levelInterval = setInterval(() => {
+          currentLevel++;
+          setDisplayedLevel(currentLevel);
+          if (currentLevel >= targetLevel) {
+            clearInterval(levelInterval);
+          }
+        }, 50);
+        starTimers.push({ clear: () => clearInterval(levelInterval) });
+      } else {
+        setDisplayedLevel(targetLevel);
+      }
+
+      return () => {
+        clearTimeout(contentTimer);
+        starTimers.forEach(t => {
+          if (t.clear) t.clear();
+          else clearTimeout(t);
+        });
+      };
+    } else {
+      setVisibleStars(0);
+      setShowContent(isFail);
+      setDisplayedLevel(state.highestCompletedLevel > 0 ? state.highestCompletedLevel : 1);
+    }
+  }, [isWin, isFail, stars, state.level, state.highestCompletedLevel]);
 
   // Cloud save on win
   useEffect(() => {
@@ -67,12 +118,16 @@ export default function WinOverlay() {
   if (isWin) {
     return (
       <div className="game-overlay active win">
-        <div className="overlay-content">
+        <div className={`overlay-content ${showContent ? 'animate-in' : ''}`}>
           <h2 className="overlay-text">SUCCESS!</h2>
-          <p className="level-complete-text">Level {state.level} Complete</p>
+          <p className="level-complete-text">Level <span className="level-number">{displayedLevel}</span> Complete</p>
           <div className="stars">
             {[1, 2, 3].map(i => (
-              <span key={i} className={`star ${i <= stars ? 'filled' : ''}`}>
+              <span
+                key={i}
+                className={`star ${i <= visibleStars ? 'filled pop-in' : ''}`}
+                style={{ animationDelay: `${i * 0.1}s` }}
+              >
                 {'\u2605'}
               </span>
             ))}

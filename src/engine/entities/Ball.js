@@ -27,6 +27,12 @@ export class Ball {
     this.squashX = 1;
     this.squashY = 1;
     this.squashAngle = 0;
+
+    // Impact rings
+    this.impactRings = [];
+
+    // Time for glow animation
+    this.time = 0;
   }
 
   reset(x, y) {
@@ -45,6 +51,8 @@ export class Ball {
     this.squashX = 1;
     this.squashY = 1;
     this.squashAngle = 0;
+    this.impactRings = [];
+    this.time = 0;
   }
 
   startVanish(x, y) {
@@ -63,11 +71,25 @@ export class Ball {
 
   onCollision(normalX, normalY, impactSpeed) {
     const intensity = Math.min(1, impactSpeed / 600);
-    const squash = 1 - ANIM.squashAmount * intensity;
-    const stretch = 1 + ANIM.squashAmount * 0.5 * intensity;
+    // Enhanced squash/stretch (1.3x more squash)
+    const squashAmount = ANIM.squashAmount * 1.3;
+    const squash = 1 - squashAmount * intensity;
+    const stretch = 1 + squashAmount * 0.5 * intensity;
     this.squashX = squash;
     this.squashY = stretch;
     this.squashAngle = Math.atan2(normalY, normalX);
+
+    // Spawn impact ring if speed is high enough
+    if (impactSpeed > 100 && this.impactRings.length < 4) {
+      this.impactRings.push({
+        x: this.x,
+        y: this.y,
+        radius: this.radius,
+        maxRadius: this.radius * 3,
+        progress: 0,
+        color: impactSpeed > 400 ? '#FF4444' : '#00F5FF',
+      });
+    }
   }
 
   update(dt, gravity) {
@@ -120,9 +142,25 @@ export class Ball {
     }
     this.trail.length = writeIdx;
 
-    // Decay squash/stretch
-    this.squashX += (1 - this.squashX) * ANIM.squashDecay * dt;
-    this.squashY += (1 - this.squashY) * ANIM.squashDecay * dt;
+    // Decay squash/stretch (0.8x slower decay for enhanced effect)
+    const decayRate = ANIM.squashDecay * 0.8;
+    this.squashX += (1 - this.squashX) * decayRate * dt;
+    this.squashY += (1 - this.squashY) * decayRate * dt;
+
+    // Update time for glow animation
+    this.time += dt;
+
+    // Update impact rings
+    let ringWriteIdx = 0;
+    for (let i = 0; i < this.impactRings.length; i++) {
+      const ring = this.impactRings[i];
+      ring.progress += dt * 3; // Ring expands over ~0.33s
+      ring.radius = ring.maxRadius * ring.progress;
+      if (ring.progress < 1) {
+        this.impactRings[ringWriteIdx++] = ring;
+      }
+    }
+    this.impactRings.length = ringWriteIdx;
   }
 
   drawTrail(ctx, theme) {
@@ -165,6 +203,18 @@ export class Ball {
 
     this.drawTrail(ctx, theme);
 
+    // Draw impact rings (behind ball)
+    for (const ring of this.impactRings) {
+      const alpha = (1 - ring.progress) * 0.6;
+      ctx.beginPath();
+      ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
+      ctx.strokeStyle = ring.color;
+      ctx.lineWidth = 2 * (1 - ring.progress);
+      ctx.globalAlpha = alpha;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
     ctx.save();
 
     if (this.vanishing) {
@@ -201,6 +251,15 @@ export class Ball {
     ctx.rotate(this.squashAngle);
     ctx.scale(this.squashX, this.squashY);
     ctx.translate(-this.x, -this.y);
+
+    // Breathing glow pulse (no shadowBlur for performance)
+    const glowAlpha = 0.4 + Math.sin(this.time * 2.5) * 0.2; // 0.2-0.6 range
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius * 1.6, 0, Math.PI * 2);
+    ctx.fillStyle = theme.ballGlow || 'rgba(255, 255, 100, 0.15)';
+    ctx.globalAlpha = glowAlpha * 0.3;
+    ctx.fill();
+    ctx.globalAlpha = 1;
 
     // Shadow
     ctx.beginPath();

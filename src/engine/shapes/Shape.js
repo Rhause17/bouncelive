@@ -352,6 +352,42 @@ export class Shape {
     ctx.restore();
   }
 
+  /**
+   * Draw 3D bevel overlay on a polygon path.
+   * Call after drawing the main fill but before stroke.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {Array} vertices - Array of {x, y} points
+   */
+  draw3DBevel(ctx, vertices) {
+    if (vertices.length < 3) return;
+
+    // Calculate bounding box for gradient
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    for (const v of vertices) {
+      minX = Math.min(minX, v.x);
+      maxX = Math.max(maxX, v.x);
+      minY = Math.min(minY, v.y);
+      maxY = Math.max(maxY, v.y);
+    }
+
+    // Create diagonal gradient from top-left to bottom-right
+    const gradient = ctx.createLinearGradient(minX, minY, maxX, maxY);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
+
+    // Draw the bevel overlay
+    ctx.beginPath();
+    ctx.moveTo(vertices[0].x, vertices[0].y);
+    for (let i = 1; i < vertices.length; i++) {
+      ctx.lineTo(vertices[i].x, vertices[i].y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+  }
+
   drawHitCheck(ctx, x, y, theme) {
     if (this.hasBeenHit) {
       ctx.beginPath();

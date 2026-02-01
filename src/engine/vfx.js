@@ -5,6 +5,7 @@ export class VFXManager {
   constructor() {
     this.particles = [];
     this.confetti = [];
+    this.floatingParticles = [];
     this.screenShake = { x: 0, y: 0, time: 0 };
     this.swoosh = { active: false, time: 0 };
   }
@@ -12,8 +13,31 @@ export class VFXManager {
   reset() {
     this.particles = [];
     this.confetti = [];
+    // Don't reset floating particles - they persist across levels
     this.screenShake = { x: 0, y: 0, time: 0 };
     this.swoosh = { active: false, time: 0 };
+  }
+
+  initFloatingParticles(width, height, theme) {
+    this.floatingParticles = [];
+    const count = 25; // Neon floating particles
+    const colors = theme.particleColors || ['#00F5FF', '#FF00AA', '#FFFF00'];
+
+    for (let i = 0; i < count; i++) {
+      this.floatingParticles.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 12, // Slightly slower movement
+        vy: (Math.random() - 0.5) * 12,
+        size: Math.random() * 2.5 + 1.5, // Slightly larger
+        alpha: Math.random() * 0.35 + 0.15,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        phase: Math.random() * Math.PI * 2, // For gentle oscillation
+        width: width,
+        height: height,
+        glowSize: Math.random() * 3 + 2, // Extra glow radius
+      });
+    }
   }
 
   spawnCollisionParticles(x, y, normalX, normalY, speed, theme) {
@@ -117,6 +141,24 @@ export class VFXManager {
         this.swoosh.active = false;
       }
     }
+
+    // Update floating particles
+    for (const fp of this.floatingParticles) {
+      fp.phase += dt * 0.5;
+
+      // Gentle oscillating movement
+      fp.x += fp.vx * dt + Math.sin(fp.phase) * 0.3;
+      fp.y += fp.vy * dt + Math.cos(fp.phase * 0.7) * 0.3;
+
+      // Wrap around screen edges
+      if (fp.x < -10) fp.x = fp.width + 10;
+      if (fp.x > fp.width + 10) fp.x = -10;
+      if (fp.y < -10) fp.y = fp.height + 10;
+      if (fp.y > fp.height + 10) fp.y = -10;
+
+      // Subtle alpha pulse
+      fp.alpha = 0.15 + Math.sin(fp.phase * 1.5) * 0.1;
+    }
   }
 
   draw(ctx) {
@@ -158,5 +200,24 @@ export class VFXManager {
     if (!this.swoosh.active) return 0;
     const t = this.swoosh.time / ANIM.swooshDuration;
     return t > 0.5 ? (1 - t) * 2 : t * 2;
+  }
+
+  drawFloatingParticles(ctx) {
+    for (const fp of this.floatingParticles) {
+      // Neon glow layer (larger, more transparent)
+      ctx.beginPath();
+      ctx.arc(fp.x, fp.y, fp.size + (fp.glowSize || 2), 0, Math.PI * 2);
+      ctx.fillStyle = fp.color;
+      ctx.globalAlpha = fp.alpha * 0.3;
+      ctx.fill();
+
+      // Core particle (smaller, brighter)
+      ctx.beginPath();
+      ctx.arc(fp.x, fp.y, fp.size, 0, Math.PI * 2);
+      ctx.fillStyle = fp.color;
+      ctx.globalAlpha = fp.alpha;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
   }
 }

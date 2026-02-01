@@ -89,6 +89,7 @@ export const SKINS = {
     ballFillStart: '#FFFF66',
     ballFillEnd: '#FFFF00',
     ballStroke: '#CCCC00',
+    ballGlow: 'rgba(255, 255, 100, 0.4)',
 
     // Basket - neon green
     basketFill: 'rgba(0, 255, 127, 0.15)',

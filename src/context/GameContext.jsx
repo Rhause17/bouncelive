@@ -248,6 +248,8 @@ export function GameProvider({ children }) {
     submitPopScale: 1,
     submitPopTime: 0,
     wasCanSubmit: false,
+    submitPressed: false,
+    submitRipples: [],
     replaySwooshTime: 0,
     prevState: 'edit',
     removeModeAlpha: 0,
@@ -260,6 +262,9 @@ export function GameProvider({ children }) {
     // Trajectory cache (invalidated on shape/basket changes)
     cachedTrajectory: null,
     trajectoryValid: false,
+
+    // Tutorial animation
+    tutorialOpenTime: 0,
   });
 
   const setupLevel = useCallback((levelNum, canvasWidth, canvasHeight) => {

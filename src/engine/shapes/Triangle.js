@@ -77,6 +77,9 @@ export class Triangle extends Shape {
     ctx.fillStyle = colors.fill;
     ctx.fill();
 
+    // 3D Bevel overlay
+    this.draw3DBevel(ctx, v);
+
     if (this.hitHighlight > 0) {
       ctx.shadowColor = theme.shapeHitHighlight;
       ctx.shadowBlur = 25 * this.hitHighlight;

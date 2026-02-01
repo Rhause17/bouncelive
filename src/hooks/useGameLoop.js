@@ -71,11 +71,29 @@ export function useGameLoop({ gameObjects, state, dispatch, onDraw }) {
       go.submitPopScale = 1;
     }
 
+    // Tutorial open animation
+    if (s.tutorialActive) {
+      go.tutorialOpenTime += dt;
+    } else {
+      go.tutorialOpenTime = 0;
+    }
+
     // Update shapes
     go.shapes.forEach(s => s.update(dt));
 
     // Update basket animation
-    if (go.basket) go.basket.update(dt);
+    if (go.basket) {
+      go.basket.update(dt);
+      // Update ball proximity for color shift effect
+      if (go.ball && s.gameState === 'sim') {
+        const dx = go.ball.x - go.basket.x;
+        const dy = go.ball.y - (go.basket.y + go.basket.depth / 2);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        go.basket.updateBallProximity(dist);
+      } else {
+        go.basket.ballProximity = 0;
+      }
+    }
 
     // Basket widen animation
     if (s.basketWidened && go.basketWidenProgress < 1 && go.basketOriginalRadius) {
@@ -97,6 +115,19 @@ export function useGameLoop({ gameObjects, state, dispatch, onDraw }) {
       go.submitButtonGlow = Math.min(1, go.submitButtonGlow + dt * 3);
     } else {
       go.submitButtonGlow = Math.max(0, go.submitButtonGlow - dt * 3);
+    }
+
+    // Update submit ripples
+    if (go.submitRipples.length > 0) {
+      let writeIdx = 0;
+      for (let i = 0; i < go.submitRipples.length; i++) {
+        const ripple = go.submitRipples[i];
+        ripple.progress += dt * 2.5; // Ripple expands over ~0.4s
+        if (ripple.progress < 1) {
+          go.submitRipples[writeIdx++] = ripple;
+        }
+      }
+      go.submitRipples.length = writeIdx;
     }
 
     // === SIMULATION STATE ===

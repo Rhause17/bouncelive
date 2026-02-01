@@ -70,6 +70,15 @@ export default function GameCanvas() {
     }
   }, [width, height]);
 
+  // Initialize floating background particles
+  useEffect(() => {
+    if (width === 0 || height === 0) return;
+    const go = gameObjects.current;
+    if (go.vfx && go.vfx.floatingParticles.length === 0) {
+      go.vfx.initFloatingParticles(width, height, THEME);
+    }
+  }, [width, height, gameObjects]);
+
   // Clear game objects when returning to welcome
   useEffect(() => {
     if (state.screen === 'welcome') {
@@ -129,6 +138,9 @@ export default function GameCanvas() {
       ctx.fillStyle = cache.vignetteGradient;
       ctx.fillRect(0, 0, w, h);
     }
+
+    // Floating background particles
+    go.vfx.drawFloatingParticles(ctx);
 
     // ===== TOP PANEL =====
     const topOffset = L.levelDataAreaHeight * (1 - animEase) + go.hudStateOffset;
@@ -272,7 +284,7 @@ export default function GameCanvas() {
     ctx.translate(0, bottomOffset);
 
     drawBottomControls(ctx, w, h, state, go, T, L);
-    drawPowerupArea(ctx, w, h, state, T, L, powerupY);
+    drawPowerupArea(ctx, w, h, state, go, T, L, powerupY);
 
     ctx.restore();
 
@@ -355,7 +367,7 @@ export default function GameCanvas() {
 
     // ===== ONE-WAY TUTORIAL (drawn last to cover everything) =====
     if (state.tutorialActive) {
-      drawOneWayTutorial(ctx, w, h, T);
+      drawOneWayTutorial(ctx, w, h, go, T);
     }
 
     // End screen shake
@@ -441,7 +453,16 @@ export default function GameCanvas() {
     // Check submit button
     const submitBox = getSubmitBoxBounds(canvasRef.current);
     if (s.canSubmit && hitTest(x, y, submitBox)) {
+      // Set pressed state and spawn ripple
+      go.submitPressed = true;
+      go.submitRipples.push({
+        x: x - submitBox.x,
+        y: y - submitBox.y,
+        progress: 0,
+      });
       submit();
+      // Reset pressed state after brief delay
+      setTimeout(() => { go.submitPressed = false; }, 150);
       return;
     }
 
@@ -760,36 +781,72 @@ function drawBottomControls(ctx, w, h, state, go, T, L) {
   };
   let submitScale = go.submitPopScale;
 
+  // 3D Press effect: move down and reduce shadow when pressed
+  const pressOffset = go.submitPressed ? 2 : 0;
+
   ctx.save();
-  ctx.translate(submitBox.x + submitBox.w / 2, submitBox.y + submitBox.h / 2);
+  ctx.translate(submitBox.x + submitBox.w / 2, submitBox.y + submitBox.h / 2 + pressOffset);
   ctx.scale(submitScale, submitScale);
   ctx.translate(-(submitBox.x + submitBox.w / 2), -(submitBox.y + submitBox.h / 2));
 
+  // Pulsing glow (no shadowBlur - use outer glow layer)
   if (state.canSubmit && go.submitButtonGlow > 0) {
     const pulse = 0.6 + Math.sin(go.time * ANIM.glowPulseSpeed * Math.PI) * 0.4;
-    ctx.shadowColor = T.submitGlow;
-    ctx.shadowBlur = 22 * go.submitButtonGlow * pulse;
+    const glowAlpha = go.submitButtonGlow * pulse * 0.4;
+
+    // Outer glow layer (instead of shadowBlur)
+    ctx.globalAlpha = glowAlpha;
+    Utils.roundRect(ctx, submitBox.x - 4, submitBox.y - 4, submitBox.w + 8, submitBox.h + 8, L.controlCornerRadius + 4);
+    ctx.fillStyle = T.submitGlow;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // Shadow (reduced when pressed)
+  if (!go.submitPressed) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    Utils.roundRect(ctx, submitBox.x + 2, submitBox.y + 3, submitBox.w, submitBox.h, L.controlCornerRadius);
+    ctx.fill();
   }
 
   Utils.roundRect(ctx, submitBox.x, submitBox.y, submitBox.w, submitBox.h, L.controlCornerRadius);
 
   if (state.canSubmit) {
-    ctx.fillStyle = T.submitStart; // Solid color for performance
+    ctx.fillStyle = go.submitPressed ? T.submitEnd : T.submitStart;
     ctx.fill();
-    ctx.shadowBlur = 0;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
     ctx.lineWidth = 1;
     Utils.roundRect(ctx, submitBox.x + 1, submitBox.y + 1, submitBox.w - 2, submitBox.h - 2, L.controlCornerRadius - 1);
     ctx.stroke();
+
+    // Ripple effect
+    if (go.submitRipples.length > 0) {
+      ctx.save();
+      ctx.beginPath();
+      Utils.roundRect(ctx, submitBox.x, submitBox.y, submitBox.w, submitBox.h, L.controlCornerRadius);
+      ctx.clip();
+
+      for (const ripple of go.submitRipples) {
+        const maxRadius = Math.max(submitBox.w, submitBox.h) * 1.5;
+        const radius = ripple.progress * maxRadius;
+        const alpha = (1 - ripple.progress) * 0.4;
+
+        ctx.beginPath();
+        ctx.arc(submitBox.x + ripple.x, submitBox.y + ripple.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     ctx.font = `700 ${L.controlBoxFontSize}px Nunito, sans-serif`;
     ctx.fillStyle = T.textOnPrimary;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('SUBMIT', submitBox.x + submitBox.w / 2, submitBox.y + submitBox.h / 2);
   } else {
-    ctx.fillStyle = T.submitDisabledStart; // Solid color for performance
+    ctx.fillStyle = T.submitDisabledStart;
     ctx.fill();
-    ctx.shadowBlur = 0;
     ctx.font = `700 ${L.controlBoxFontSize}px Nunito, sans-serif`;
     ctx.fillStyle = T.textMuted;
     ctx.textAlign = 'center';
@@ -799,7 +856,7 @@ function drawBottomControls(ctx, w, h, state, go, T, L) {
   ctx.restore();
 }
 
-function drawPowerupArea(ctx, w, h, state, T, L, powerupY) {
+function drawPowerupArea(ctx, w, h, state, go, T, L, powerupY) {
   ctx.fillStyle = T.panelPowerupStart; // Solid color for performance
   ctx.fillRect(0, powerupY, w, L.powerupAreaHeight);
 
@@ -817,22 +874,43 @@ function drawPowerupArea(ctx, w, h, state, T, L, powerupY) {
   ];
 
   buttons.forEach((btn, i) => {
-    const bx = spacing + i * (btnSize + spacing);
+    let bx = spacing + i * (btnSize + spacing);
+    let by = btnY;
 
-    Utils.roundRect(ctx, bx, btnY, btnSize, btnSize, L.boxCornerRadius);
+    // Shake effect when count === 1 (low warning)
+    if (btn.count === 1) {
+      const shakeAmount = Math.sin(go.time * 20) * 2;
+      bx += shakeAmount;
+    }
+
+    ctx.save();
+
+    // Glow effect when available (count > 0)
+    if (btn.count > 0) {
+      const glowPulse = 0.3 + Math.sin(go.time * 3) * 0.2;
+      ctx.globalAlpha = glowPulse;
+      Utils.roundRect(ctx, bx - 3, by - 3, btnSize + 6, btnSize + 6, L.boxCornerRadius + 3);
+      ctx.fillStyle = btn.stroke;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    Utils.roundRect(ctx, bx, by, btnSize, btnSize, L.boxCornerRadius);
     ctx.fillStyle = btn.start; // Solid color for performance
     ctx.fill();
 
     ctx.strokeStyle = btn.stroke;
     ctx.lineWidth = 1.5;
-    Utils.roundRect(ctx, bx, btnY, btnSize, btnSize, L.boxCornerRadius);
+    Utils.roundRect(ctx, bx, by, btnSize, btnSize, L.boxCornerRadius);
     ctx.stroke();
+
+    ctx.restore();
 
     // Draw icon - CENTERED, consistent sizes across all powerups
     const isDisabled = btn.count <= 0;
     const iconColor = isDisabled ? 'rgba(100, 116, 139, 0.5)' : T.textPrimary;
     const centerX = bx + btnSize / 2;
-    const centerY = btnY + btnSize / 2;
+    const centerY = by + btnSize / 2;
     const iconCenterY = centerY - 10; // Shift icon up for better spacing from count
 
     // Consistent icon bounding box: 22x22 for all icons
@@ -1009,7 +1087,16 @@ function getPowerupButtonHit(canvas, x, y) {
   return null;
 }
 
-function drawOneWayTutorial(ctx, w, h, T) {
+function drawOneWayTutorial(ctx, w, h, go, T) {
+  // Animation timing
+  const entryDuration = 0.3;
+  const entryProgress = Math.min(1, (go.tutorialOpenTime || 0) / entryDuration);
+  const easeOut = 1 - Math.pow(1 - entryProgress, 3); // Cubic ease-out
+
+  // Animated entry: fade + scale
+  ctx.save();
+  ctx.globalAlpha = easeOut;
+
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
   ctx.fillRect(0, 0, w, h);
 
@@ -1018,6 +1105,12 @@ function drawOneWayTutorial(ctx, w, h, T) {
   const boxX = (w - boxW) / 2;
   const boxY = (h - boxH) / 2;
   const radius = 16;
+
+  // Scale animation from center
+  const scale = 0.9 + 0.1 * easeOut;
+  ctx.translate(w / 2, h / 2);
+  ctx.scale(scale, scale);
+  ctx.translate(-w / 2, -h / 2);
 
   ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
   ctx.shadowBlur = 20;
@@ -1030,19 +1123,48 @@ function drawOneWayTutorial(ctx, w, h, T) {
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
 
-  ctx.strokeStyle = T.glassBorder || 'rgba(255, 255, 255, 0.1)';
-  ctx.lineWidth = 1;
+  // Pulsing magenta border
+  const borderPulse = 0.5 + Math.sin(go.time * 4) * 0.3;
+  ctx.strokeStyle = T.oneWayHighlight || '#FF00AA';
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = easeOut * borderPulse;
   ctx.stroke();
+  ctx.globalAlpha = easeOut;
 
-  // Title
+  // Title (no arrow icon per spec)
+  const titleY = boxY + 65;
   ctx.fillStyle = T.textPrimary;
   ctx.font = `bold ${44 * SIZE_SCALE}px Nunito, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('One-Way Bounce', w / 2, boxY + 65);
+  ctx.fillText('One-Way Bounce', w / 2, titleY);
+
+  // One-way line demo (static line showing the highlight color)
+  const demoY = boxY + 100;
+  const lineLength = 80;
+  const lineX = w / 2 - lineLength / 2;
+
+  // Draw the static one-way highlighted line
+  ctx.strokeStyle = T.oneWayHighlight || '#FF00AA';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(lineX, demoY);
+  ctx.lineTo(lineX + lineLength, demoY);
+  ctx.stroke();
+
+  // Add small glow effect to the line (no moving elements)
+  ctx.beginPath();
+  ctx.moveTo(lineX, demoY);
+  ctx.lineTo(lineX + lineLength, demoY);
+  ctx.strokeStyle = T.oneWayHighlight || '#FF00AA';
+  ctx.lineWidth = 8;
+  ctx.globalAlpha = easeOut * 0.2;
+  ctx.stroke();
+  ctx.globalAlpha = easeOut;
 
   // Body text with highlighted "this side"
-  const bodyY = boxY + 130;
+  const bodyY = boxY + 150;
   const regularFont = `${32 * SIZE_SCALE}px Nunito, sans-serif`;
   const boldFont = `bold ${32 * SIZE_SCALE}px Nunito, sans-serif`;
 
@@ -1066,7 +1188,7 @@ function drawOneWayTutorial(ctx, w, h, T) {
   ctx.font = regularFont;
   ctx.fillText(text1, startX, bodyY);
 
-  ctx.fillStyle = T.oneWayHighlight || '#f97316';
+  ctx.fillStyle = T.oneWayHighlight || '#FF00AA';
   ctx.font = boldFont;
   ctx.fillText(text2, startX + text1W, bodyY);
 
@@ -1074,11 +1196,15 @@ function drawOneWayTutorial(ctx, w, h, T) {
   ctx.font = regularFont;
   ctx.fillText(text3, startX + text1W + text2W, bodyY);
 
-  // Dismiss instruction
+  // Tap to continue with pulse animation
+  const tapPulse = 0.4 + Math.sin(go.time * 2) * 0.3;
+  ctx.globalAlpha = easeOut * tapPulse;
   ctx.fillStyle = T.textMuted;
   ctx.font = `${24 * SIZE_SCALE}px Nunito, sans-serif`;
   ctx.textAlign = 'center';
   ctx.fillText('Tap anywhere to continue', w / 2, boxY + boxH - 35);
+
+  ctx.restore();
 }
 
 function updateCanSubmit(go, dispatch, state) {

@@ -12,6 +12,11 @@ export class Basket {
     this.targetLidOpen = false;
     this.pulseScale = 1;
     this.pulseTime = 0;
+
+    // Animation time for glow pulse
+    this.time = 0;
+    // Ball proximity (0-1) for color shift effect
+    this.ballProximity = 0;
   }
 
   reset() {
@@ -20,6 +25,8 @@ export class Basket {
     this.targetLidOpen = false;
     this.pulseScale = 1;
     this.pulseTime = 0;
+    this.time = 0;
+    this.ballProximity = 0;
   }
 
   openLid() {
@@ -32,7 +39,33 @@ export class Basket {
     this.pulseTime = ANIM.basketPulseDuration;
   }
 
+  /**
+   * Update ball proximity for color shift effect.
+   * @param {number} distance - Distance from ball to basket center
+   */
+  updateBallProximity(distance) {
+    const maxDist = 200;
+    this.ballProximity = Math.max(0, 1 - distance / maxDist);
+  }
+
+  /**
+   * Get stroke color based on ball proximity (green → gold)
+   */
+  getProximityColor(theme) {
+    if (this.ballProximity <= 0) return theme.basketStroke;
+
+    // Interpolate from green (#00FF7F) to gold (#FFD700)
+    const t = this.ballProximity;
+    const r = Math.round(0 + t * 255);
+    const g = Math.round(255 - t * 40);
+    const b = Math.round(127 - t * 127);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
   update(dt) {
+    // Update animation time
+    this.time += dt;
+
     if (this.targetLidOpen && this.lidOpenProgress < 1) {
       this.lidOpenProgress += dt * ANIM.lidOpenSpeed;
       if (this.lidOpenProgress > 1) {
@@ -81,14 +114,21 @@ export class Basket {
       ctx.translate(-this.x, -(this.y + this.depth / 2));
     }
 
-    // Inner fill (darker for depth)
+    // Inner fill with depth gradient (lighter at top, darker at bottom)
+    const depthGradient = ctx.createLinearGradient(
+      this.x, this.y,
+      this.x, this.y + this.depth
+    );
+    depthGradient.addColorStop(0, 'rgba(0, 255, 127, 0.2)');
+    depthGradient.addColorStop(1, 'rgba(0, 255, 127, 0.08)');
+
     ctx.beginPath();
     ctx.moveTo(this.x - hw, this.y);
     ctx.lineTo(this.x - hw, this.y + this.depth);
     ctx.lineTo(this.x + hw, this.y + this.depth);
     ctx.lineTo(this.x + hw, this.y);
     ctx.closePath();
-    ctx.fillStyle = theme.basketFill;
+    ctx.fillStyle = depthGradient;
     ctx.fill();
 
     // NET PATTERN - single batched path for performance
@@ -130,13 +170,33 @@ export class Basket {
     ctx.lineWidth = 4;
     ctx.stroke();
 
+    // Get stroke color (shifts green→gold based on ball proximity)
+    const strokeColor = this.getProximityColor(theme);
+
+    // Pulsing glow effect (no shadowBlur - use multiple strokes)
+    const glowIntensity = 0.4 + Math.sin(this.time * 3) * 0.2; // 0.2-0.6 range
+
+    // Outer glow layer
+    ctx.beginPath();
+    ctx.moveTo(this.x - hw, this.y);
+    ctx.lineTo(this.x - hw, this.y + this.depth);
+    ctx.lineTo(this.x + hw, this.y + this.depth);
+    ctx.lineTo(this.x + hw, this.y);
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalAlpha = glowIntensity * 0.3;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
     // Body outline (U-shape)
     ctx.beginPath();
     ctx.moveTo(this.x - hw, this.y);
     ctx.lineTo(this.x - hw, this.y + this.depth);
     ctx.lineTo(this.x + hw, this.y + this.depth);
     ctx.lineTo(this.x + hw, this.y);
-    ctx.strokeStyle = theme.basketStroke;
+    ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
