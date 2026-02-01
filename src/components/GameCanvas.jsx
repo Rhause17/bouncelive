@@ -162,24 +162,6 @@ export default function GameCanvas() {
       ctx.setLineDash([8, 6]);
       ctx.stroke();
       ctx.setLineDash([]);
-
-      // Hint text above piece area - only on level 1, fades when piece moved
-      if (state.level === 1 && go.pieceHintAlpha > 0) {
-        // Fade out when any piece has been moved
-        const anyMoved = go.shapes.some(s => s.hasBeenMoved);
-        if (anyMoved && go.pieceHintAlpha > 0) {
-          go.pieceHintAlpha = Math.max(0, go.pieceHintAlpha - 0.05);
-        }
-
-        ctx.save();
-        ctx.globalAlpha = go.pieceHintAlpha;
-        ctx.font = `700 ${L.controlBoxFontSize * 0.85}px Nunito, sans-serif`;
-        ctx.fillStyle = T.textSecondary;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('Place objects to submit', w / 2, go.pieceAreaY - 10);
-        ctx.restore();
-      }
     }
 
     // ===== BASKET LINE =====
@@ -217,32 +199,17 @@ export default function GameCanvas() {
     // ===== VFX =====
     go.vfx.draw(ctx);
 
-    // ===== BOTTOM CONTROLS =====
-    const powerupY = h - L.powerupAreaHeight;
-    const bottomOffset = (L.bottomControlsHeight + L.powerupAreaHeight) * (1 - animEase);
-
-    ctx.save();
-    ctx.translate(0, bottomOffset);
-
-    drawBottomControls(ctx, w, h, state, go, T, L);
-    drawPowerupArea(ctx, w, h, state, T, L, powerupY);
-
-    ctx.restore();
-
-    // ===== REMOVE MODE OVERLAY (after bottom controls to cover them) =====
-    // Animate tint alpha
-    if (state.selectRemoveTargetMode) {
-      go.removeModeAlpha = Math.min(1, go.removeModeAlpha + 0.08);
-    } else {
-      go.removeModeAlpha = Math.max(0, go.removeModeAlpha - 0.12);
+    // ===== ONE-WAY TUTORIAL =====
+    if (state.tutorialActive) {
+      drawOneWayTutorial(ctx, w, h, T);
     }
 
-    if (go.removeModeAlpha > 0) {
-      const tintAlpha = go.removeModeAlpha * 0.65;
-
-      // Dark tint over ENTIRE screen
-      ctx.fillStyle = `rgba(0, 0, 0, ${tintAlpha})`;
-      ctx.fillRect(0, 0, w, h);
+    // ===== REMOVE MODE OVERLAY =====
+    if (state.selectRemoveTargetMode) {
+      // Dark tint over everything except powerup area
+      const powerupTop = h - LAYOUT.powerupAreaHeight;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+      ctx.fillRect(0, 0, w, powerupTop);
 
       // Re-draw shapes above tint with pulsing red glow
       const glowPulse = 0.6 + 0.3 * Math.sin(go.time * 4);
@@ -251,7 +218,7 @@ export default function GameCanvas() {
         if (!s.isVisible()) return;
 
         ctx.save();
-        ctx.globalAlpha = (s.opacity != null ? s.opacity : 1) * go.removeModeAlpha;
+        ctx.globalAlpha = s.opacity != null ? s.opacity : 1;
 
         // Pulsing red glow
         ctx.shadowColor = `rgba(248, 113, 113, ${glowPulse})`;
@@ -279,21 +246,24 @@ export default function GameCanvas() {
       });
 
       // Hint text
-      ctx.save();
-      ctx.globalAlpha = go.removeModeAlpha;
       ctx.font = `700 ${16 * SIZE_SCALE}px Nunito, sans-serif`;
       ctx.fillStyle = '#f87171';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const hintY = h - L.powerupAreaHeight - 30;
-      ctx.fillText('Tap an object to remove', w / 2, hintY);
-      ctx.restore();
+      ctx.fillText('Tap an object to remove', w / 2, powerupTop - 30);
     }
 
-    // ===== ONE-WAY TUTORIAL (drawn last to cover everything) =====
-    if (state.tutorialActive) {
-      drawOneWayTutorial(ctx, w, h, T);
-    }
+    // ===== BOTTOM CONTROLS =====
+    const powerupY = h - L.powerupAreaHeight;
+    const bottomOffset = (L.bottomControlsHeight + L.powerupAreaHeight) * (1 - animEase);
+
+    ctx.save();
+    ctx.translate(0, bottomOffset);
+
+    drawBottomControls(ctx, w, h, state, go, T, L);
+    drawPowerupArea(ctx, w, h, state, T, L, powerupY);
+
+    ctx.restore();
 
     // End screen shake
     ctx.restore();
@@ -788,110 +758,101 @@ function drawPowerupArea(ctx, w, h, state, T, L, powerupY) {
     Utils.roundRect(ctx, bx, btnY, btnSize, btnSize, L.boxCornerRadius);
     ctx.stroke();
 
-    // Draw icon - CENTERED, consistent sizes across all powerups
+    // Draw icon
     const isDisabled = btn.count <= 0;
     const iconColor = isDisabled ? 'rgba(100, 116, 139, 0.5)' : T.textPrimary;
     const centerX = bx + btnSize / 2;
     const centerY = btnY + btnSize / 2;
-    const iconCenterY = centerY - 10; // Shift icon up for better spacing from count
-
-    // Consistent icon bounding box: 22x22 for all icons
-    const iconSize = 11; // Half-size, so total is 22x22
 
     ctx.save();
-    ctx.translate(centerX, iconCenterY);
+    ctx.translate(centerX, centerY);
 
     if (btn.label === 'T') {
-      // Trajectory icon: SYMMETRIC CURVED PATH with ball and arrow
+      // Trajectory icon: dotted arc + ball + arrowhead
       ctx.strokeStyle = iconColor;
       ctx.lineWidth = 2;
-      ctx.setLineDash([2.5, 2.5]);
+      ctx.setLineDash([2, 3]);
       ctx.beginPath();
-      // Symmetric parabola centered at origin, fits in iconSize bounds
-      ctx.moveTo(-iconSize, 5);
-      ctx.quadraticCurveTo(0, -8, iconSize, 5);
+      ctx.arc(-8, 4, 14, -Math.PI * 0.8, -Math.PI * 0.15);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Ball at start of trajectory (left)
       ctx.beginPath();
-      ctx.arc(-iconSize, 5, 3.5, 0, Math.PI * 2);
+      ctx.arc(-8, -6, 3.5, 0, Math.PI * 2);
       ctx.fillStyle = iconColor;
       ctx.fill();
 
-      // Arrowhead at end (right)
       ctx.beginPath();
-      ctx.moveTo(iconSize + 2, 5);
-      ctx.lineTo(iconSize - 2, 1);
-      ctx.lineTo(iconSize - 2, 9);
+      ctx.moveTo(8, 0);
+      ctx.lineTo(4, -3);
+      ctx.lineTo(4, 3);
       ctx.closePath();
       ctx.fill();
     } else if (btn.label === 'R') {
-      // Hammer icon - SMALLER and CENTERED
+      // Hammer icon
       ctx.fillStyle = iconColor;
       ctx.strokeStyle = iconColor;
+      ctx.lineWidth = 2;
 
-      // Hammer head (smaller, centered)
       ctx.save();
-      ctx.translate(0, -1);
       ctx.rotate(-Math.PI / 4);
-      ctx.fillRect(-6, -4, 12, 8);
+      ctx.fillRect(-10, -5, 12, 10);
       ctx.restore();
 
-      // Handle (shorter, centered)
       ctx.beginPath();
-      ctx.moveTo(1, 1);
-      ctx.lineTo(7, 7);
+      ctx.moveTo(-2, 2);
+      ctx.lineTo(8, 12);
       ctx.lineWidth = 3;
       ctx.lineCap = 'round';
       ctx.stroke();
     } else if (btn.label === 'E') {
-      // Expand/Widen icon: CENTERED bidirectional arrow
+      // Double-sided arrow icon
       ctx.strokeStyle = iconColor;
       ctx.fillStyle = iconColor;
       ctx.lineWidth = 2.5;
       ctx.lineCap = 'round';
 
-      // Horizontal line (fits in iconSize bounds)
       ctx.beginPath();
-      ctx.moveTo(-iconSize, 0);
-      ctx.lineTo(iconSize, 0);
+      ctx.moveTo(-10, 0);
+      ctx.lineTo(10, 0);
       ctx.stroke();
 
-      // Left arrowhead
       ctx.beginPath();
-      ctx.moveTo(-iconSize, 0);
-      ctx.lineTo(-iconSize + 5, -4);
-      ctx.moveTo(-iconSize, 0);
-      ctx.lineTo(-iconSize + 5, 4);
+      ctx.moveTo(-10, 0);
+      ctx.lineTo(-5, -5);
+      ctx.moveTo(-10, 0);
+      ctx.lineTo(-5, 5);
       ctx.stroke();
 
-      // Right arrowhead
       ctx.beginPath();
-      ctx.moveTo(iconSize, 0);
-      ctx.lineTo(iconSize - 5, -4);
-      ctx.moveTo(iconSize, 0);
-      ctx.lineTo(iconSize - 5, 4);
+      ctx.moveTo(10, 0);
+      ctx.lineTo(5, -5);
+      ctx.moveTo(10, 0);
+      ctx.lineTo(5, 5);
       ctx.stroke();
     }
 
     ctx.restore();
 
-    // Count displayed INSIDE button, below icon
-    const countY = centerY + 14;
-    const countText = `×${btn.count}`;
+    // Count badge (bottom-right corner)
+    const badgeX = bx + btnSize - 8;
+    const badgeY2 = btnY + btnSize - 8;
+    const badgeRadius = 8;
 
-    ctx.font = '800 14px Nunito, sans-serif';
+    ctx.beginPath();
+    ctx.arc(badgeX, badgeY2, badgeRadius, 0, Math.PI * 2);
+    ctx.fillStyle = isDisabled ? 'rgba(100, 116, 139, 0.6)' : (
+      btn.label === 'T' ? T.secondary :
+      btn.label === 'R' ? (T.danger || '#F87171') :
+      T.secondary
+    );
+    ctx.fill();
+
+    ctx.font = '700 10px Nunito, sans-serif';
+    ctx.fillStyle = isDisabled ? 'rgba(255, 255, 255, 0.5)' : '#0F172A';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-
-    if (btn.count > 0) {
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillText(countText, centerX, countY);
-    } else {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.fillText('×0', centerX, countY);
-    }
+    ctx.fillText(btn.count.toString(), badgeX, badgeY2);
   });
 }
 
@@ -969,10 +930,7 @@ function getPowerupButtonHit(canvas, x, y) {
   return null;
 }
 
-function drawOneWayTutorial(ctx, w, h, T, tutorialAlpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = tutorialAlpha;
-
+function drawOneWayTutorial(ctx, w, h, T) {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
   ctx.fillRect(0, 0, w, h);
 
@@ -993,39 +951,55 @@ function drawOneWayTutorial(ctx, w, h, T, tutorialAlpha = 1) {
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
 
-  ctx.strokeStyle = T.oneWayHighlight || '#FF00AA';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = T.glassBorder || 'rgba(255, 255, 255, 0.1)';
+  ctx.lineWidth = 1;
   ctx.stroke();
 
-  // Title - prominent header style
-  ctx.fillStyle = T.oneWayHighlight || '#FF00AA';
-  ctx.font = `900 ${48 * SIZE_SCALE}px Nunito, sans-serif`;
+  // Title
+  ctx.fillStyle = T.textPrimary;
+  ctx.font = `bold ${44 * SIZE_SCALE}px Nunito, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('ONE-WAY BOUNCE', w / 2, boxY + 60);
+  ctx.fillText('One-Way Bounce', w / 2, boxY + 65);
 
-  // Body text line 1
-  const bodyY1 = boxY + 125;
-  const bodyY2 = boxY + 170;
-  const regularFont = `${30 * SIZE_SCALE}px Nunito, sans-serif`;
-  const highlightFont = `900 ${34 * SIZE_SCALE}px Nunito, sans-serif`;
+  // Body text with highlighted "this side"
+  const bodyY = boxY + 130;
+  const regularFont = `${32 * SIZE_SCALE}px Nunito, sans-serif`;
+  const boldFont = `bold ${32 * SIZE_SCALE}px Nunito, sans-serif`;
+
+  const text1 = 'Ball will bounce from only ';
+  const text2 = 'this side';
+  const text3 = '.';
+
+  ctx.font = regularFont;
+  const text1W = ctx.measureText(text1).width;
+  ctx.font = boldFont;
+  const text2W = ctx.measureText(text2).width;
+  ctx.font = regularFont;
+  const text3W = ctx.measureText(text3).width;
+
+  const totalW = text1W + text2W + text3W;
+  const startX = (w - totalW) / 2;
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = T.textSecondary;
+  ctx.font = regularFont;
+  ctx.fillText(text1, startX, bodyY);
+
+  ctx.fillStyle = T.oneWayHighlight || '#f97316';
+  ctx.font = boldFont;
+  ctx.fillText(text2, startX + text1W, bodyY);
 
   ctx.fillStyle = T.textSecondary;
   ctx.font = regularFont;
-  ctx.textAlign = 'center';
-  ctx.fillText('Ball will bounce from only', w / 2, bodyY1);
-
-  // "THIS SIDE" on separate line, highlighted
-  ctx.fillStyle = T.oneWayHighlight || '#FF00AA';
-  ctx.font = highlightFont;
-  ctx.fillText('THIS SIDE', w / 2, bodyY2);
+  ctx.fillText(text3, startX + text1W + text2W, bodyY);
 
   // Dismiss instruction
   ctx.fillStyle = T.textMuted;
   ctx.font = `${24 * SIZE_SCALE}px Nunito, sans-serif`;
+  ctx.textAlign = 'center';
   ctx.fillText('Tap anywhere to continue', w / 2, boxY + boxH - 35);
-
-  ctx.restore();
 }
 
 function updateCanSubmit(go, dispatch, state) {
