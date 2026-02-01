@@ -1,32 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useGame } from '../context/GameContext.jsx';
-import { useAuth } from '../context/AuthContext.jsx';
-import { loadSave } from '../lib/cloudSave.js';
-import Leaderboard from './Leaderboard.jsx';
 
 export default function WelcomeScreen() {
   const { state, dispatch } = useGame();
-  const { user, loading, signInAnonymously, signInWithGoogle, signOut } = useAuth();
-  const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [cloudHighest, setCloudHighest] = useState(null);
-
-  // Load cloud save on login
-  useEffect(() => {
-    if (!user) { setCloudHighest(null); return; }
-    loadSave(user.id).then(save => {
-      if (save) setCloudHighest(save.highest_level);
-    });
-  }, [user]);
 
   if (state.screen !== 'welcome') return null;
 
-  const displayHighest = cloudHighest != null
-    ? Math.max(cloudHighest, state.highestCompletedLevel)
-    : state.highestCompletedLevel;
-
-  if (showLeaderboard) {
-    return <Leaderboard onClose={() => setShowLeaderboard(false)} />;
-  }
+  const displayHighest = state.highestCompletedLevel;
 
   return (
     <div className="welcome-screen">
@@ -57,26 +37,6 @@ export default function WelcomeScreen() {
         >
           Start
         </button>
-        <div className="welcome-actions">
-          {!loading && !user && (
-            <>
-              <button className="welcome-link" onClick={signInAnonymously}>
-                Play as Guest
-              </button>
-              <button className="welcome-link" onClick={signInWithGoogle}>
-                Sign in with Google
-              </button>
-            </>
-          )}
-          {!loading && user && (
-            <button className="welcome-link" onClick={signOut}>
-              Sign Out
-            </button>
-          )}
-          <button className="welcome-link" onClick={() => setShowLeaderboard(true)}>
-            Leaderboard
-          </button>
-        </div>
       </div>
     </div>
   );

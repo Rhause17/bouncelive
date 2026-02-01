@@ -81,7 +81,7 @@ export class Basket {
       ctx.translate(-this.x, -(this.y + this.depth / 2));
     }
 
-    // Inner fill
+    // Inner fill (darker for depth)
     ctx.beginPath();
     ctx.moveTo(this.x - hw, this.y);
     ctx.lineTo(this.x - hw, this.y + this.depth);
@@ -91,17 +91,53 @@ export class Basket {
     ctx.fillStyle = theme.basketFill;
     ctx.fill();
 
+    // NET PATTERN - diagonal cross-hatch lines
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(this.x - hw + 2, this.y + 2, hw * 2 - 4, this.depth - 4);
+    ctx.clip();
+
+    const netColor = theme.basketStroke;
+    ctx.strokeStyle = netColor;
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.4;
+
+    const spacing = 12;
+    const startX = this.x - hw;
+    const endX = this.x + hw;
+    const startY = this.y;
+    const endY = this.y + this.depth;
+
+    // Diagonal lines going down-right
+    for (let i = -this.depth; i < hw * 2 + this.depth; i += spacing) {
+      ctx.beginPath();
+      ctx.moveTo(startX + i, startY);
+      ctx.lineTo(startX + i + this.depth, endY);
+      ctx.stroke();
+    }
+
+    // Diagonal lines going down-left
+    for (let i = -this.depth; i < hw * 2 + this.depth; i += spacing) {
+      ctx.beginPath();
+      ctx.moveTo(endX - i, startY);
+      ctx.lineTo(endX - i - this.depth, endY);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
     // Shadow
     ctx.beginPath();
     ctx.moveTo(this.x - hw + 2, this.y + 3);
     ctx.lineTo(this.x - hw + 2, this.y + this.depth + 3);
     ctx.lineTo(this.x + hw + 2, this.y + this.depth + 3);
     ctx.lineTo(this.x + hw + 2, this.y + 3);
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.12)';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // Body
+    // Body outline (U-shape)
     ctx.beginPath();
     ctx.moveTo(this.x - hw, this.y);
     ctx.lineTo(this.x - hw, this.y + this.depth);
@@ -113,31 +149,41 @@ export class Basket {
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // Inner highlight
-    ctx.beginPath();
-    ctx.moveTo(this.x - hw + 3, this.y + 3);
-    ctx.lineTo(this.x - hw + 3, this.y + this.depth - 3);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    // TOP BARRIER - single line that opens from center outward
+    const barrierColor = this.lidOpen ? theme.basketStroke : theme.basketLid;
+    const barrierGlow = this.lidOpen ? theme.basketStroke : theme.basketLidGlow;
 
-    // Lid
-    if (this.lidOpenProgress < 1) {
-      const lidY = this.y - this.lidOpenProgress * 15;
-      const lidAlpha = 1 - this.lidOpenProgress;
+    // Opening animation: line splits from center and moves outward
+    const openAmount = this.lidOpenProgress; // 0 = closed, 1 = fully open
+    const halfWidth = hw + 4;
+    const gapHalf = openAmount * halfWidth; // Gap grows from center
 
-      ctx.globalAlpha = lidAlpha;
-      ctx.shadowColor = theme.basketLidGlow;
-      ctx.shadowBlur = 10;
-      ctx.beginPath();
-      ctx.moveTo(this.x - hw, lidY);
-      ctx.lineTo(this.x + hw, lidY);
-      ctx.strokeStyle = theme.basketLid;
-      ctx.lineWidth = 4;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
+    ctx.shadowColor = barrierGlow;
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = barrierColor;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+
+    if (openAmount < 1) {
+      // Draw left segment (from left edge to center-gap)
+      if (this.x - halfWidth < this.x - gapHalf) {
+        ctx.beginPath();
+        ctx.moveTo(this.x - halfWidth, this.y);
+        ctx.lineTo(this.x - gapHalf, this.y);
+        ctx.stroke();
+      }
+
+      // Draw right segment (from center+gap to right edge)
+      if (this.x + gapHalf < this.x + halfWidth) {
+        ctx.beginPath();
+        ctx.moveTo(this.x + gapHalf, this.y);
+        ctx.lineTo(this.x + halfWidth, this.y);
+        ctx.stroke();
+      }
     }
+    // When fully open (openAmount >= 1), don't draw the barrier at all
+
+    ctx.shadowBlur = 0;
 
     ctx.restore();
   }
