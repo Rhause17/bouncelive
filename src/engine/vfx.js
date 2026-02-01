@@ -71,18 +71,22 @@ export class VFXManager {
   }
 
   update(dt) {
-    for (let i = this.particles.length - 1; i >= 0; i--) {
+    // In-place removal to avoid O(n) splice operations
+    let writeIdx = 0;
+    for (let i = 0; i < this.particles.length; i++) {
       const p = this.particles[i];
       p.vy += p.gravity * dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.life -= dt;
-      if (p.life <= 0) {
-        this.particles.splice(i, 1);
+      if (p.life > 0) {
+        this.particles[writeIdx++] = p;
       }
     }
+    this.particles.length = writeIdx;
 
-    for (let i = this.confetti.length - 1; i >= 0; i--) {
+    writeIdx = 0;
+    for (let i = 0; i < this.confetti.length; i++) {
       const c = this.confetti[i];
       c.vy += c.gravity * dt;
       c.vx *= 0.99;
@@ -90,10 +94,11 @@ export class VFXManager {
       c.y += c.vy * dt;
       c.rotation += c.rotationSpeed * dt;
       c.life -= dt;
-      if (c.life <= 0) {
-        this.confetti.splice(i, 1);
+      if (c.life > 0) {
+        this.confetti[writeIdx++] = c;
       }
     }
+    this.confetti.length = writeIdx;
 
     if (this.screenShake.time > 0) {
       this.screenShake.time -= dt;

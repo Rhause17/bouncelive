@@ -109,13 +109,16 @@ export class Ball {
       this.lastTrailY = this.y;
     }
 
-    // Fade out trail points
+    // Fade out trail points and remove dead ones in-place (avoid allocation)
+    let writeIdx = 0;
     for (let i = 0; i < this.trail.length; i++) {
       this.trail[i].life -= dt * ANIM.trailFadeSpeed;
       this.trail[i].size *= 0.97;
+      if (this.trail[i].life > 0) {
+        this.trail[writeIdx++] = this.trail[i];
+      }
     }
-
-    this.trail = this.trail.filter(p => p.life > 0);
+    this.trail.length = writeIdx;
 
     // Decay squash/stretch
     this.squashX += (1 - this.squashX) * ANIM.squashDecay * dt;
@@ -128,10 +131,9 @@ export class Ball {
     const speed = Utils.length({ x: this.vx, y: this.vy });
     const isHighSpeed = speed > ANIM.trailHighSpeedThreshold;
 
-    const sortedTrail = [...this.trail].sort((a, b) => a.life - b.life);
-
-    for (let i = 0; i < sortedTrail.length; i++) {
-      const point = sortedTrail[i];
+    // Draw trail without sorting - order doesn't affect visual result for circles
+    for (let i = 0; i < this.trail.length; i++) {
+      const point = this.trail[i];
       const alpha = point.life * 0.6;
       if (alpha <= 0.01) continue;
 
@@ -175,18 +177,10 @@ export class Ball {
       ctx.scale(scale, scale);
       ctx.translate(-this.vanishX, -this.vanishY);
 
-      const gradient = ctx.createRadialGradient(
-        this.vanishX - this.radius * 0.3, this.vanishY - this.radius * 0.3, 0,
-        this.vanishX, this.vanishY, this.radius,
-      );
-      gradient.addColorStop(0, '#FFFFFF');
-      gradient.addColorStop(0.3, theme.ballFillStart);
-      gradient.addColorStop(0.8, theme.ballFillEnd);
-      gradient.addColorStop(1, theme.ballStroke);
-
+      // Solid color for performance (gradient was expensive on mobile)
       ctx.beginPath();
       ctx.arc(this.vanishX, this.vanishY, this.radius, 0, Math.PI * 2);
-      ctx.fillStyle = gradient;
+      ctx.fillStyle = theme.ballFillEnd;
       ctx.fill();
 
       if (progress < 0.5) {
@@ -214,19 +208,10 @@ export class Ball {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
     ctx.fill();
 
-    // Ball gradient
-    const gradient = ctx.createRadialGradient(
-      this.x - this.radius * 0.3, this.y - this.radius * 0.3, 0,
-      this.x, this.y, this.radius,
-    );
-    gradient.addColorStop(0, '#FFFFFF');
-    gradient.addColorStop(0.3, theme.ballFillStart);
-    gradient.addColorStop(0.8, theme.ballFillEnd);
-    gradient.addColorStop(1, theme.ballStroke);
-
+    // Solid color for performance (gradient was expensive on mobile)
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fillStyle = gradient;
+    ctx.fillStyle = theme.ballFillEnd;
     ctx.fill();
 
     // Rim

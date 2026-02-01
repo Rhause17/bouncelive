@@ -259,7 +259,11 @@ export default function GameCanvas() {
       ctx.fillRect(0, 0, w, powerupTop);
 
       // Re-draw shapes above tint with pulsing red glow
-      const glowPulse = 0.6 + 0.3 * Math.sin(go.time * 4);
+      // Pre-calculate pulse values once (avoid recalculating sin() per shape)
+      const sinVal = Math.sin(go.time * 4);
+      const glowPulse = 0.6 + 0.3 * sinVal;
+      const shadowBlurVal = 18 + 6 * sinVal;
+      const shadowColorStr = `rgba(248, 113, 113, ${glowPulse.toFixed(2)})`;
 
       go.shapes.forEach(s => {
         if (!s.isVisible()) return;
@@ -267,9 +271,9 @@ export default function GameCanvas() {
         ctx.save();
         ctx.globalAlpha = s.opacity != null ? s.opacity : 1;
 
-        // Pulsing red glow
-        ctx.shadowColor = `rgba(248, 113, 113, ${glowPulse})`;
-        ctx.shadowBlur = 18 + 6 * Math.sin(go.time * 4);
+        // Pulsing red glow - use pre-calculated values
+        ctx.shadowColor = shadowColorStr;
+        ctx.shadowBlur = shadowBlurVal;
 
         // Draw shape segments with neutral fill + red stroke
         const segs = s.getSegments();
@@ -1027,7 +1031,15 @@ function drawOneWayTutorial(ctx, w, h, T) {
 }
 
 function updateCanSubmit(go, dispatch, state) {
-  const allPlaced = go.shapes.filter(s => s.isVisible() && !s.removedByPowerup).every(s => s.hasBeenMoved);
+  // Avoid array allocation by using a simple loop
+  let allPlaced = true;
+  for (let i = 0; i < go.shapes.length; i++) {
+    const s = go.shapes[i];
+    if (s.isVisible() && !s.removedByPowerup && !s.hasBeenMoved) {
+      allPlaced = false;
+      break;
+    }
+  }
   if (allPlaced !== state.allShapesPlaced) {
     dispatch({ type: 'SET_ALL_SHAPES_PLACED', value: allPlaced });
   }

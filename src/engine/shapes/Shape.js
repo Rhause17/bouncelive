@@ -356,10 +356,8 @@ export class Shape {
     if (this.hasBeenHit) {
       ctx.beginPath();
       ctx.arc(x, y, 7 * SIZE_SCALE, 0, Math.PI * 2);
-      const grad = ctx.createRadialGradient(x, y, 0, x, y, 7 * SIZE_SCALE);
-      grad.addColorStop(0, theme.successLight);
-      grad.addColorStop(1, theme.success);
-      ctx.fillStyle = grad;
+      // Solid color for performance (gradient was expensive on mobile)
+      ctx.fillStyle = theme.success;
       ctx.fill();
       ctx.fillStyle = '#fff';
       ctx.font = `bold ${8 * SIZE_SCALE}px sans-serif`;
