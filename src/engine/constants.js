@@ -191,6 +191,7 @@ export const ANIM = {
 export const LAYOUT = {
   levelDataAreaHeight: 75,
   levelDataAreaPadding: 12,
+  ballSpawnMargin: 50,
 
   movesBoxWidth: 100,
   movesBoxHeight: 55,

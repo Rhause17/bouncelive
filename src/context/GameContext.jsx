@@ -312,7 +312,7 @@ export function GameProvider({ children }) {
     // Ball position
     const ballOnLeft = rand() > 0.5;
     const halfWidth = w / 2;
-    const safeMargin = L.pieceAreaMargin + ballRadius + 10;
+    const safeMargin = L.ballSpawnMargin;
     let ballX;
     if (ballOnLeft) {
       ballX = safeMargin + rand() * (halfWidth - safeMargin * 2);
@@ -324,7 +324,7 @@ export function GameProvider({ children }) {
 
     // Basket position
     const basketRadius = 35 * SIZE_SCALE;
-    const basketSafeMargin = L.pieceAreaMargin + basketRadius + 10;
+    const basketSafeMargin = L.ballSpawnMargin;
     let basketX;
     if (ballOnLeft) {
       basketX = halfWidth + basketSafeMargin + rand() * (halfWidth - basketSafeMargin * 2);
