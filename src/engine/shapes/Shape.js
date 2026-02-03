@@ -424,16 +424,27 @@ export class Shape {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    for (let i = 0; i < segments.length; i++) {
-      const seg = segments[i];
+    // Build array of which segments are one-way
+    const isOneWay = segments.map((seg, i) => {
       const logicalSideIndex = (seg.sideIndex !== undefined) ? seg.sideIndex : i;
+      return allowedSides.includes(logicalSideIndex);
+    });
 
-      if (allowedSides.includes(logicalSideIndex)) {
-        ctx.beginPath();
-        ctx.moveTo(seg.a.x, seg.a.y);
-        ctx.lineTo(seg.b.x, seg.b.y);
-        ctx.stroke();
-      }
+    // Helper to check if two points are the same (within tolerance)
+    const pointsEqual = (p1, p2) => {
+      const eps = 2.0; // Increased tolerance for rotated shapes
+      return Math.abs(p1.x - p2.x) < eps && Math.abs(p1.y - p2.y) < eps;
+    };
+
+    // Draw each one-way segment individually to ensure all are drawn
+    for (let i = 0; i < segments.length; i++) {
+      if (!isOneWay[i]) continue;
+
+      const seg = segments[i];
+      ctx.beginPath();
+      ctx.moveTo(seg.a.x, seg.a.y);
+      ctx.lineTo(seg.b.x, seg.b.y);
+      ctx.stroke();
     }
   }
 

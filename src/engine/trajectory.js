@@ -1,4 +1,4 @@
-import { SIZE_SCALE, ANIM } from './constants.js';
+import { SIZE_SCALE, ANIM, ShapeTypeEnum } from './constants.js';
 import { Utils } from './utils.js';
 
 /**
@@ -46,6 +46,7 @@ export function predictTrajectory(physics, shapes, basket, ballSpawnX, ballUpper
 
       for (const shape of shapes) {
         if (!shape.isVisible()) continue;
+
         const segments = shape.getSegments();
         for (let segIdx = 0; segIdx < segments.length; segIdx++) {
           const seg = segments[segIdx];
@@ -61,6 +62,16 @@ export function predictTrajectory(physics, shapes, basket, ballSpawnX, ballUpper
             reboundPoints.push({ x: ghost.x, y: ghost.y, time: totalTime });
             willVanish = bounceCount === 0;
             return { hitPoint: null, reboundPoints, hitShape: true, maxSteps: reboundPoints.length, willVanish };
+          }
+
+          // Flipper: trajectory ends at hit point (smooth approach)
+          if (shape.shapeType === ShapeTypeEnum.PINBALL_BOUNCER) {
+            // Add final point close to collision, but not exactly on surface to avoid kink
+            // Use ghost position pushed back slightly from collision
+            const hitX = ghost.x - collision.normal.x * (collision.penetration * 0.5);
+            const hitY = ghost.y - collision.normal.y * (collision.penetration * 0.5);
+            reboundPoints.push({ x: hitX, y: hitY, time: totalTime });
+            return { hitPoint: null, reboundPoints, hitShape: true, maxSteps: reboundPoints.length, hitFlipper: true };
           }
 
           ghost.x += collision.normal.x * collision.penetration;
@@ -129,8 +140,9 @@ export function predictTrajectory(physics, shapes, basket, ballSpawnX, ballUpper
 /**
  * Draw trajectory preview on canvas.
  * Uses even dot distribution along the total path length.
+ * @param {number} beltFlashProgress - 0 to 1 for belt flash color (0 = cyan, 1 = orange, fades over 400ms)
  */
-export function drawTrajectory(ctx, trajectory, time, trajectoryExtended, theme) {
+export function drawTrajectory(ctx, trajectory, time, trajectoryExtended, theme, beltFlashProgress = 0) {
   if (trajectory.reboundPoints.length < 2) return;
 
   const points = trajectory.reboundPoints;
@@ -149,6 +161,14 @@ export function drawTrajectory(ctx, trajectory, time, trajectoryExtended, theme)
     if (timeProgress > FADE_END) return 0;
     return MAX_ALPHA * smoothstep(FADE_END, FADE_START, timeProgress);
   };
+
+  // Calculate dot color based on belt flash progress
+  // beltFlashProgress: 1 = full orange, 0 = normal cyan
+  let dotColor = theme.trajectoryStart;
+  if (beltFlashProgress > 0 && theme.trajectoryBeltFlash) {
+    // Interpolate between cyan and orange
+    dotColor = `rgba(${Math.round(0 + 255 * beltFlashProgress)}, ${Math.round(245 - 138 * beltFlashProgress)}, ${Math.round(255 - 255 * beltFlashProgress)}, 0.8)`;
+  }
 
   // Calculate total trajectory length for even dot distribution
   let totalLength = 0;
@@ -189,7 +209,7 @@ export function drawTrajectory(ctx, trajectory, time, trajectoryExtended, theme)
           const size = Math.max(1.5, 3 * (1 - progress * 0.5));
           ctx.beginPath();
           ctx.arc(x, y, size, 0, Math.PI * 2);
-          ctx.fillStyle = theme.trajectoryStart;
+          ctx.fillStyle = dotColor;
           ctx.globalAlpha = alpha;
           ctx.fill();
         }

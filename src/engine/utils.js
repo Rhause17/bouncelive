@@ -309,14 +309,14 @@ export const Utils = {
     const logicalSideIndex = (seg.sideIndex !== undefined) ? seg.sideIndex : segIdx;
 
     // Check if this is a corner collision
-    const CORNER_THRESHOLD = 0.08; // Slightly larger than physics threshold for safety
+    // Use SAME threshold as physics (0.05) for consistency
+    const CORNER_THRESHOLD = 0.05;
     const isCornerA = collision && collision.t <= CORNER_THRESHOLD;
     const isCornerB = collision && collision.t >= (1 - CORNER_THRESHOLD);
     const isCornerCollision = isCornerA || isCornerB;
 
     if (isCornerCollision) {
       // For corner collisions, check BOTH adjacent segments
-      // Corner is safe only if BOTH sides meeting at corner are allowed
       const segments = shape.getSegments();
       const numSegs = segments.length;
 
@@ -338,9 +338,16 @@ export const Utils = {
       const currentAllowed = isSideAllowed(logicalSideIndex, seg);
       const adjacentAllowed = isSideAllowed(adjacentLogicalIdx, adjacentSeg);
 
-      // Corner is safe ONLY if both sides are allowed
-      result.isBounceSide = currentAllowed && adjacentAllowed;
-      result.shouldVanish = !(currentAllowed && adjacentAllowed);
+      // If both segments have the SAME sideIndex, treat as normal edge collision
+      // This handles sawtooth teeth corners where all teeth share sideIndex 0
+      if (logicalSideIndex === adjacentLogicalIdx) {
+        result.isBounceSide = currentAllowed;
+        result.shouldVanish = !currentAllowed;
+      } else {
+        // Different sides meeting at corner: safe ONLY if both sides are allowed
+        result.isBounceSide = currentAllowed && adjacentAllowed;
+        result.shouldVanish = !(currentAllowed && adjacentAllowed);
+      }
     } else {
       // Normal segment collision (not at corner)
       if (seg.isActiveSide !== undefined) {

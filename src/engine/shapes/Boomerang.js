@@ -27,9 +27,11 @@ export class Boomerang extends PolygonShape {
   containsPoint(px, py) { return this.containsPointConcave(px, py); }
 
   clampToCanvas(w, h, bottomLimit) {
-    const margin = 10, halfSize = this.armLength + 10;
-    this.x = Utils.clamp(this.x, halfSize + margin, w - halfSize - margin);
-    this.y = Utils.clamp(this.y, halfSize + margin, bottomLimit - halfSize - margin);
+    // Use armLength as the max radius (accounts for any rotation)
+    const margin = 5;
+    const maxRadius = this.armLength;
+    this.x = Utils.clamp(this.x, maxRadius + margin, w - maxRadius - margin);
+    this.y = Utils.clamp(this.y, maxRadius + margin, bottomLimit - maxRadius - margin);
   }
 
   draw(ctx, theme) { this.drawPolygon(ctx, theme); }

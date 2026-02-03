@@ -4,7 +4,7 @@ import { useCanvasSize } from '../hooks/useCanvasSize.js';
 import { useGameLoop } from '../hooks/useGameLoop.js';
 import { getTheme } from '../engine/themes.js';
 import { Utils } from '../engine/utils.js';
-import { LAYOUT, ANIM, GRAVITY_PRESETS, REBOUND_PRESETS, SIZE_SCALE } from '../engine/constants.js';
+import { LAYOUT, ANIM, GRAVITY_PRESETS, REBOUND_PRESETS, SIZE_SCALE, TutorialType } from '../engine/constants.js';
 import { predictTrajectory, drawTrajectory } from '../engine/trajectory.js';
 
 const THEME = getTheme('arcadeDark');
@@ -15,6 +15,8 @@ export default function GameCanvas() {
   const { width, height } = useCanvasSize();
   const patternCanvasRef = useRef(null);
   const lastTapTimeRef = useRef(0); // For double-tap detection
+  const levelPassTapRef = useRef({ count: 0, lastTime: 0 }); // Hidden level selector trigger
+  const levelSelectorOpenRef = useRef(false); // Level selector panel state
   const gradientCacheRef = useRef({ width: 0, height: 0 }); // Cached gradients for performance
 
   // Create background dot pattern once
@@ -267,7 +269,9 @@ export default function GameCanvas() {
         );
         go.trajectoryValid = true;
       }
-      drawTrajectory(ctx, go.cachedTrajectory, go.time, state.trajectoryExtended, T);
+      // Belt flash progress: 1 at start, fades to 0 over 400ms
+      const beltFlashProgress = go.beltFlashTimer ? go.beltFlashTimer / 0.4 : 0;
+      drawTrajectory(ctx, go.cachedTrajectory, go.time, state.trajectoryExtended, T, beltFlashProgress);
     }
 
     // ===== BALL =====
@@ -312,6 +316,7 @@ export default function GameCanvas() {
 
       go.shapes.forEach(s => {
         if (!s.isVisible()) return;
+        if (s.isLevelObstacle) return; // Don't highlight level obstacles (flipper)
 
         ctx.save();
         ctx.globalAlpha = (s.opacity != null ? s.opacity : 1) * go.removeModeAlpha;
@@ -365,9 +370,14 @@ export default function GameCanvas() {
       ctx.restore();
     }
 
-    // ===== ONE-WAY TUTORIAL (drawn last to cover everything) =====
-    if (state.tutorialActive) {
-      drawOneWayTutorial(ctx, w, h, go, T);
+    // ===== TUTORIAL POPUPS (drawn last to cover everything) =====
+    if (state.tutorialActive && state.tutorialType) {
+      drawTutorial(ctx, w, h, go, T, state.tutorialType);
+    }
+
+    // ===== LEVEL SELECTOR PANEL =====
+    if (levelSelectorOpenRef.current) {
+      drawLevelSelector(ctx, w, h, T, state.level);
     }
 
     // End screen shake
@@ -417,6 +427,68 @@ export default function GameCanvas() {
 
     if (s.gameState !== 'edit') return;
 
+    // Hidden level selector: tap level display 4 times to open
+    const L = LAYOUT;
+    const w = canvasRef.current.width;
+    const h = canvasRef.current.height;
+
+    // Handle level selector panel clicks
+    if (levelSelectorOpenRef.current) {
+      const panelW = 280;
+      const panelH = 320;
+      const panelX = (w - panelW) / 2;
+      const panelY = (h - panelH) / 2;
+
+      // Check if click is inside the panel
+      if (x >= panelX && x <= panelX + panelW && y >= panelY && y <= panelY + panelH) {
+        // Calculate which level button was clicked
+        const gridStartX = panelX + 20;
+        const gridStartY = panelY + 50;
+        const btnSize = 44;
+        const gap = 8;
+        const cols = 5;
+
+        const col = Math.floor((x - gridStartX) / (btnSize + gap));
+        const row = Math.floor((y - gridStartY) / (btnSize + gap));
+
+        if (col >= 0 && col < cols && row >= 0 && row < 4) {
+          const levelNum = row * cols + col + 1;
+          if (levelNum >= 1 && levelNum <= 20) {
+            levelSelectorOpenRef.current = false;
+            setupLevel(levelNum, w, h);
+            return;
+          }
+        }
+      } else {
+        // Click outside panel - close it
+        levelSelectorOpenRef.current = false;
+        return;
+      }
+      return;
+    }
+
+    const levelDisplayBox = {
+      x: L.movesBoxX + L.movesBoxWidth + 10,
+      y: L.movesBoxY,
+      w: w - L.movesBoxX - L.movesBoxWidth - L.specsBoxWidth - L.specsBoxMarginRight - 20,
+      h: L.movesBoxHeight,
+    };
+    if (y < L.levelDataAreaHeight && x > levelDisplayBox.x && x < levelDisplayBox.x + levelDisplayBox.w) {
+      const now = Date.now();
+      const tapState = levelPassTapRef.current;
+      if (now - tapState.lastTime < 800) {
+        tapState.count++;
+      } else {
+        tapState.count = 1;
+      }
+      tapState.lastTime = now;
+      if (tapState.count >= 4) {
+        tapState.count = 0;
+        levelSelectorOpenRef.current = true;
+        return;
+      }
+    }
+
     // Tutorial dismiss
     if (s.tutorialActive) {
       dispatch({ type: 'DISMISS_TUTORIAL' });
@@ -428,6 +500,7 @@ export default function GameCanvas() {
       for (let i = go.shapes.length - 1; i >= 0; i--) {
         const shape = go.shapes[i];
         if (!shape.isVisible()) continue;
+        if (shape.isLevelObstacle) continue; // Skip level obstacles (flipper)
         if (shape.containsPoint(x, y)) {
           shape.hasBeenHit = true;
           shape.hasBeenMoved = true;
@@ -438,7 +511,7 @@ export default function GameCanvas() {
           return;
         }
       }
-      // Tap outside shape cancels
+      // Tap outside removable shape (or on level obstacle) cancels
       dispatch({ type: 'EXIT_REMOVE_MODE' });
       return;
     }
@@ -471,8 +544,11 @@ export default function GameCanvas() {
       const shape = go.shapes[i];
       if (!shape.isVisible()) continue;
 
-      // Check rotate handle first
-      if (shape.containsRotateHandle(x, y)) {
+      // Skip level obstacles (not draggable/rotatable)
+      if (shape.isLevelObstacle) continue;
+
+      // Check rotate handle first (if rotatable)
+      if (shape.rotatable !== false && shape.containsRotateHandle(x, y)) {
         dragState.current = {
           isDragging: false,
           isRotating: true,
@@ -487,7 +563,8 @@ export default function GameCanvas() {
         return;
       }
 
-      if (shape.touchAreaContains(x, y)) {
+      // Check drag (if draggable)
+      if (shape.draggable !== false && shape.touchAreaContains(x, y)) {
         shape.saveDragStart(); // Save position for snap-back on invalid drop
         dragState.current = {
           isDragging: true,
@@ -1087,124 +1164,349 @@ function getPowerupButtonHit(canvas, x, y) {
   return null;
 }
 
-function drawOneWayTutorial(ctx, w, h, go, T) {
-  // Animation timing
+// ========================================
+// UNIFIED TUTORIAL POPUP SYSTEM
+// ========================================
+
+const TUTORIAL_CONFIGS = {
+  [TutorialType.ONE_WAY]: {
+    title: 'One-Way Bounce',
+    borderColor: '#FF00AA',
+    boxHeight: 270,
+    demoOffsetY: 95,
+    bodyOffsetY: 155,
+    drawDemo: (ctx, cx, cy, time, T) => {
+      // One-way line demo
+      const lineLength = 80;
+      const lineX = cx - lineLength / 2;
+
+      // Glow effect
+      ctx.beginPath();
+      ctx.moveTo(lineX, cy);
+      ctx.lineTo(lineX + lineLength, cy);
+      ctx.strokeStyle = T.oneWayHighlight || '#FF00AA';
+      ctx.lineWidth = 8;
+      ctx.lineCap = 'round';
+      ctx.globalAlpha = 0.2;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // Main line
+      ctx.beginPath();
+      ctx.moveTo(lineX, cy);
+      ctx.lineTo(lineX + lineLength, cy);
+      ctx.strokeStyle = T.oneWayHighlight || '#FF00AA';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+    },
+    bodyLines: [
+      {
+        parts: [
+          { text: 'Ball will bounce from only ', color: 'textSecondary' },
+          { text: 'this side', color: '#FF00AA', bold: true },
+          { text: '.', color: 'textSecondary' },
+        ]
+      },
+    ],
+  },
+
+  [TutorialType.CONVEYOR_BELT]: {
+    title: 'Conveyor Belt',
+    borderColor: '#FF6B00',
+    boxHeight: 270,
+    demoOffsetY: 100,
+    bodyOffsetY: 160,
+    drawDemo: drawMiniConveyor,
+    bodyLines: [
+      {
+        parts: [
+          { text: 'Ball gets a ', color: 'textSecondary' },
+          { text: 'SIDEWAYS PUSH', color: '#FF6B00', bold: true },
+        ]
+      },
+      { text: 'when bouncing off this belt.', color: 'textSecondary', size: 'normal' },
+    ],
+  },
+
+  [TutorialType.PINBALL_BOUNCER]: {
+    title: 'Pinball Flipper',
+    borderColor: '#FFD700',
+    boxHeight: 270,
+    demoOffsetY: 105,
+    bodyOffsetY: 175,
+    drawDemo: drawMiniFlipper,
+    bodyLines: [
+      {
+        parts: [
+          { text: 'Ball will ', color: 'textSecondary' },
+          { text: 'bounce', color: '#FFD700', bold: true },
+          { text: ' from the flipper!', color: 'textSecondary' },
+        ]
+      },
+      { text: "You can't move the flipper.", color: 'textMuted', size: 'small' },
+    ],
+  },
+};
+
+function drawTutorial(ctx, w, h, go, T, tutorialType) {
+  const config = TUTORIAL_CONFIGS[tutorialType];
+  if (!config) return;
+
+  // Entry animation
   const entryDuration = 0.3;
   const entryProgress = Math.min(1, (go.tutorialOpenTime || 0) / entryDuration);
-  const easeOut = 1 - Math.pow(1 - entryProgress, 3); // Cubic ease-out
+  const easeOut = 1 - Math.pow(1 - entryProgress, 3);
 
-  // Animated entry: fade + scale
   ctx.save();
   ctx.globalAlpha = easeOut;
 
+  // Dark overlay
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
   ctx.fillRect(0, 0, w, h);
 
+  // Box dimensions
   const boxW = w * 0.92;
-  const boxH = 280;
+  const boxH = config.boxHeight;
   const boxX = (w - boxW) / 2;
   const boxY = (h - boxH) / 2;
-  const radius = 16;
 
-  // Scale animation from center
+  // Scale animation
   const scale = 0.9 + 0.1 * easeOut;
   ctx.translate(w / 2, h / 2);
   ctx.scale(scale, scale);
   ctx.translate(-w / 2, -h / 2);
 
+  // Box shadow & fill
   ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
   ctx.shadowBlur = 20;
   ctx.shadowOffsetY = 4;
-
   ctx.fillStyle = T.glassBackgroundSolid || 'rgba(51, 65, 85, 0.95)';
   ctx.beginPath();
-  ctx.roundRect(boxX, boxY, boxW, boxH, radius);
+  ctx.roundRect(boxX, boxY, boxW, boxH, 16);
   ctx.fill();
   ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
 
-  // Pulsing magenta border
+  // Pulsing border
   const borderPulse = 0.5 + Math.sin(go.time * 4) * 0.3;
-  ctx.strokeStyle = T.oneWayHighlight || '#FF00AA';
+  ctx.strokeStyle = config.borderColor;
   ctx.lineWidth = 2;
   ctx.globalAlpha = easeOut * borderPulse;
   ctx.stroke();
   ctx.globalAlpha = easeOut;
 
-  // Title (no arrow icon per spec)
-  const titleY = boxY + 65;
+  // Title
   ctx.fillStyle = T.textPrimary;
   ctx.font = `bold ${44 * SIZE_SCALE}px Nunito, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('One-Way Bounce', w / 2, titleY);
+  ctx.fillText(config.title, w / 2, boxY + 45);
 
-  // One-way line demo (static line showing the highlight color)
-  const demoY = boxY + 100;
-  const lineLength = 80;
-  const lineX = w / 2 - lineLength / 2;
+  // Demo (custom per tutorial)
+  ctx.save();
+  config.drawDemo(ctx, w / 2, boxY + config.demoOffsetY, go.time, T);
+  ctx.restore();
 
-  // Draw the static one-way highlighted line
-  ctx.strokeStyle = T.oneWayHighlight || '#FF00AA';
-  ctx.lineWidth = 4;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(lineX, demoY);
-  ctx.lineTo(lineX + lineLength, demoY);
-  ctx.stroke();
+  // Body text
+  drawTutorialBodyLines(ctx, w, boxY + config.bodyOffsetY, config.bodyLines, T);
 
-  // Add small glow effect to the line (no moving elements)
-  ctx.beginPath();
-  ctx.moveTo(lineX, demoY);
-  ctx.lineTo(lineX + lineLength, demoY);
-  ctx.strokeStyle = T.oneWayHighlight || '#FF00AA';
-  ctx.lineWidth = 8;
-  ctx.globalAlpha = easeOut * 0.2;
-  ctx.stroke();
-  ctx.globalAlpha = easeOut;
-
-  // Body text with highlighted "this side"
-  const bodyY = boxY + 150;
-  const regularFont = `${32 * SIZE_SCALE}px Nunito, sans-serif`;
-  const boldFont = `bold ${32 * SIZE_SCALE}px Nunito, sans-serif`;
-
-  const text1 = 'Ball will bounce from only ';
-  const text2 = 'this side';
-  const text3 = '.';
-
-  ctx.font = regularFont;
-  const text1W = ctx.measureText(text1).width;
-  ctx.font = boldFont;
-  const text2W = ctx.measureText(text2).width;
-  ctx.font = regularFont;
-  const text3W = ctx.measureText(text3).width;
-
-  const totalW = text1W + text2W + text3W;
-  const startX = (w - totalW) / 2;
-
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = T.textSecondary;
-  ctx.font = regularFont;
-  ctx.fillText(text1, startX, bodyY);
-
-  ctx.fillStyle = T.oneWayHighlight || '#FF00AA';
-  ctx.font = boldFont;
-  ctx.fillText(text2, startX + text1W, bodyY);
-
-  ctx.fillStyle = T.textSecondary;
-  ctx.font = regularFont;
-  ctx.fillText(text3, startX + text1W + text2W, bodyY);
-
-  // Tap to continue with pulse animation
+  // Tap to continue
   const tapPulse = 0.4 + Math.sin(go.time * 2) * 0.3;
   ctx.globalAlpha = easeOut * tapPulse;
   ctx.fillStyle = T.textMuted;
   ctx.font = `${24 * SIZE_SCALE}px Nunito, sans-serif`;
   ctx.textAlign = 'center';
-  ctx.fillText('Tap anywhere to continue', w / 2, boxY + boxH - 35);
+  ctx.fillText('Tap anywhere to continue', w / 2, boxY + boxH - 30);
 
   ctx.restore();
+}
+
+function drawTutorialBodyLines(ctx, w, startY, lines, T) {
+  let y = startY;
+
+  for (const line of lines) {
+    ctx.textBaseline = 'middle';
+
+    if (line.parts) {
+      // Multi-part line with highlights
+      let totalWidth = 0;
+      for (const part of line.parts) {
+        ctx.font = part.bold
+          ? `bold ${32 * SIZE_SCALE}px Nunito, sans-serif`
+          : `${32 * SIZE_SCALE}px Nunito, sans-serif`;
+        totalWidth += ctx.measureText(part.text).width;
+      }
+
+      let x = (w - totalWidth) / 2;
+      ctx.textAlign = 'left';
+      for (const part of line.parts) {
+        ctx.font = part.bold
+          ? `bold ${32 * SIZE_SCALE}px Nunito, sans-serif`
+          : `${32 * SIZE_SCALE}px Nunito, sans-serif`;
+        ctx.fillStyle = part.color.startsWith('#') ? part.color : T[part.color];
+        ctx.fillText(part.text, x, y);
+        x += ctx.measureText(part.text).width;
+      }
+    } else {
+      // Simple single-color line
+      const fontSize = line.size === 'small' ? 24 : 32;
+      ctx.font = `${fontSize * SIZE_SCALE}px Nunito, sans-serif`;
+      ctx.fillStyle = line.color.startsWith('#') ? line.color : T[line.color];
+      ctx.textAlign = 'center';
+      ctx.fillText(line.text, w / 2, y);
+    }
+
+    y += line.size === 'small' ? 28 : 32;
+  }
+}
+
+function drawMiniConveyor(ctx, cx, cy, time, T) {
+  const beltW = 120;
+  const beltH = 40;
+  const r = beltH / 2;
+  const straightHalfLen = beltW / 2 - r;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // Belt body
+  ctx.beginPath();
+  ctx.moveTo(-straightHalfLen, -beltH / 2);
+  ctx.lineTo(straightHalfLen, -beltH / 2);
+  ctx.arc(straightHalfLen, 0, r, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(-straightHalfLen, beltH / 2);
+  ctx.arc(-straightHalfLen, 0, r, Math.PI / 2, -Math.PI / 2);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(60, 70, 90, 0.85)';
+  ctx.fill();
+
+  // 3D Bevel
+  const gradient = ctx.createLinearGradient(-straightHalfLen, -beltH / 2, straightHalfLen, beltH / 2);
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 0.12)');
+  gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0.08)');
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  // Belt stroke
+  ctx.strokeStyle = 'rgba(100, 110, 130, 1)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Animated arrows with edge fade (like real conveyor)
+  const arrowSpacing = 18;
+  const arrowSize = 5;
+  const edgePad = arrowSize * 1.5;
+  const phase = (time * 35) % arrowSpacing;
+
+  const getEdgeAlpha = (x) => {
+    const distFromEdge = Math.min(x + straightHalfLen, straightHalfLen - x);
+    if (distFromEdge < edgePad) {
+      return Math.max(0, distFromEdge / edgePad);
+    }
+    return 1;
+  };
+
+  ctx.lineWidth = 1.8;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Top arrows - moving RIGHT
+  const topY = -beltH * 0.22;
+  const startX = -straightHalfLen - arrowSpacing;
+  const endX = straightHalfLen + arrowSpacing;
+
+  for (let x = startX + phase; x < endX; x += arrowSpacing) {
+    const alpha = getEdgeAlpha(x);
+    if (alpha < 0.01) continue;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.6 * alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(x - arrowSize, topY - arrowSize * 0.5);
+    ctx.lineTo(x + arrowSize * 0.5, topY);
+    ctx.lineTo(x - arrowSize, topY + arrowSize * 0.5);
+    ctx.stroke();
+  }
+
+  // Bottom arrows - moving LEFT
+  const bottomY = beltH * 0.22;
+
+  for (let x = endX - phase; x > startX; x -= arrowSpacing) {
+    const alpha = getEdgeAlpha(x);
+    if (alpha < 0.01) continue;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.6 * alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(x + arrowSize, bottomY - arrowSize * 0.5);
+    ctx.lineTo(x - arrowSize * 0.5, bottomY);
+    ctx.lineTo(x + arrowSize, bottomY + arrowSize * 0.5);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawMiniFlipper(ctx, cx, cy, time, T) {
+  // Static flipper at rest angle (same as board)
+  const angle = 30; // Pointing down-right (positive angle)
+  const angleRad = angle * Math.PI / 180;
+
+  // Flipper dimensions (scaled to ~70% of actual)
+  const bodyLength = 90 * SIZE_SCALE * 0.7;
+  const tipWidth = 21 * SIZE_SCALE * 0.7;
+  const pivotWidth = tipWidth * 1.3;
+  const tipR = tipWidth / 2;
+  const pivotR = pivotWidth / 2;
+  const pivotPinR = 8 * SIZE_SCALE * 0.7;
+
+  // Get theme colors (same as board shapes)
+  const fill = T.shapeFills ? T.shapeFills[0] : 'rgba(148, 163, 184, 0.35)';
+  const stroke = T.shapeStrokes ? T.shapeStrokes[0] : 'rgba(100, 116, 139, 1)';
+
+  // Offset pivot to center the flipper visually
+  const pivotX = cx - 15;
+  const pivotY = cy;
+
+  ctx.save();
+  ctx.translate(pivotX, pivotY);
+  ctx.rotate(angleRad);
+
+  // Shadow
+  ctx.save();
+  ctx.translate(2, 4);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  drawFlipperPath(ctx, bodyLength, tipR, pivotR);
+  ctx.fill();
+  ctx.restore();
+
+  // Body fill (theme color)
+  ctx.fillStyle = fill;
+  drawFlipperPath(ctx, bodyLength, tipR, pivotR);
+  ctx.fill();
+
+  // Body stroke (theme color)
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Pivot ring (same as board)
+  ctx.beginPath();
+  ctx.arc(0, 0, pivotPinR, 0, Math.PI * 2);
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawFlipperPath(ctx, edgeLen, narrowR, wideR) {
+  ctx.beginPath();
+  // Wide end (at pivot)
+  ctx.arc(0, 0, wideR, Math.PI / 2, -Math.PI / 2, true);
+  // Top edge
+  ctx.lineTo(edgeLen, -narrowR);
+  // Narrow end (tip)
+  ctx.arc(edgeLen, 0, narrowR, -Math.PI / 2, Math.PI / 2);
+  // Bottom edge
+  ctx.lineTo(0, wideR);
+  ctx.closePath();
 }
 
 function updateCanSubmit(go, dispatch, state) {
@@ -1212,6 +1514,8 @@ function updateCanSubmit(go, dispatch, state) {
   let allPlaced = true;
   for (let i = 0; i < go.shapes.length; i++) {
     const s = go.shapes[i];
+    // Skip level obstacles (like flipper) - they don't need to be moved
+    if (s.isLevelObstacle) continue;
     if (s.isVisible() && !s.removedByPowerup && !s.hasBeenMoved) {
       allPlaced = false;
       break;
@@ -1224,4 +1528,70 @@ function updateCanSubmit(go, dispatch, state) {
   if (canSubmit !== state.canSubmit) {
     dispatch({ type: 'SET_CAN_SUBMIT', value: canSubmit });
   }
+}
+
+function drawLevelSelector(ctx, w, h, T, currentLevel) {
+  const panelW = 280;
+  const panelH = 320;
+  const panelX = (w - panelW) / 2;
+  const panelY = (h - panelH) / 2;
+
+  // Dim background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(0, 0, w, h);
+
+  // Panel background
+  ctx.fillStyle = T.bgPanel;
+  ctx.strokeStyle = T.neonCyan;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(panelX, panelY, panelW, panelH, 12);
+  ctx.fill();
+  ctx.stroke();
+
+  // Title
+  ctx.fillStyle = T.textPrimary;
+  ctx.font = `bold ${18}px Nunito, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Select Level', panelX + panelW / 2, panelY + 28);
+
+  // Level buttons grid (5 columns, 4 rows = 20 levels)
+  const gridStartX = panelX + 20;
+  const gridStartY = panelY + 50;
+  const btnSize = 44;
+  const gap = 8;
+  const cols = 5;
+
+  for (let i = 0; i < 20; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const levelNum = i + 1;
+
+    const btnX = gridStartX + col * (btnSize + gap);
+    const btnY = gridStartY + row * (btnSize + gap);
+
+    // Button background
+    const isCurrentLevel = levelNum === currentLevel;
+    ctx.fillStyle = isCurrentLevel ? 'rgba(0, 245, 255, 0.3)' : 'rgba(60, 70, 90, 0.8)';
+    ctx.strokeStyle = isCurrentLevel ? T.neonCyan : 'rgba(100, 116, 139, 0.5)';
+    ctx.lineWidth = isCurrentLevel ? 2 : 1;
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnSize, btnSize, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    // Level number
+    ctx.fillStyle = isCurrentLevel ? T.neonCyan : T.textSecondary;
+    ctx.font = `bold ${16}px Nunito, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(levelNum), btnX + btnSize / 2, btnY + btnSize / 2);
+  }
+
+  // Hint text
+  ctx.fillStyle = T.textMuted;
+  ctx.font = `${12}px Nunito, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('Tap outside to close', panelX + panelW / 2, panelY + panelH - 15);
 }

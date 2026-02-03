@@ -5,10 +5,32 @@ import { Ball } from '../engine/entities/Ball.js';
 import { Basket } from '../engine/entities/Basket.js';
 import { createShape } from '../engine/shapeFactory.js';
 import { getLevelConfig } from '../data/levels.js';
+import { PinballBouncer } from '../engine/shapes/PinballBouncer.js';
 import {
   SIZE_SCALE, LAYOUT, ANIM, OBJECT_ID_MAP, ONEWAY_ELIGIBLE,
-  NORMAL_SHAPES, ODD_SHAPES,
+  NORMAL_SHAPES, ODD_SHAPES, TutorialType, ShapeTypeEnum,
 } from '../engine/constants.js';
+
+// ========================================
+// TUTORIAL PERSISTENCE
+// ========================================
+const TUTORIAL_STORAGE_KEY = 'bouncelive_completed_tutorials';
+
+function getCompletedTutorials() {
+  try {
+    return JSON.parse(localStorage.getItem(TUTORIAL_STORAGE_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function markTutorialComplete(tutorialType) {
+  const completed = getCompletedTutorials();
+  if (!completed.includes(tutorialType)) {
+    completed.push(tutorialType);
+    localStorage.setItem(TUTORIAL_STORAGE_KEY, JSON.stringify(completed));
+  }
+}
 
 // ========================================
 // STATE
@@ -18,8 +40,8 @@ const initialState = {
   screen: 'welcome',    // 'welcome' | 'playing' | 'gameover'
   gameState: 'edit',     // 'edit' | 'sim' | 'win' | 'fail'
   level: 1,
-  lives: 5,
-  initialLives: 5,
+  lives: 7,
+  initialLives: 7,
   highestCompletedLevel: 0,
   canSubmit: false,
   hasSubmittedOnce: false,
@@ -28,6 +50,7 @@ const initialState = {
   gravityLevel: 'Normal',
   reboundLevel: 'Normal',
   tutorialActive: false,
+  tutorialType: null,        // TutorialType enum value
   selectRemoveTargetMode: false,
   activePowerupPopover: null, // 'T' | 'R' | 'E' | null
 
@@ -62,8 +85,8 @@ function gameReducer(state, action) {
         screen: 'playing',
         gameState: 'edit',
         level: 1,
-        lives: 5,
-        initialLives: 5,
+        lives: 7,
+        initialLives: 7,
         highestCompletedLevel: 0,
         runModifiers: { ...initialState.runModifiers },
         trajectoryCount: 3,
@@ -78,8 +101,8 @@ function gameReducer(state, action) {
         ...state,
         gameState: 'edit',
         level: action.level,
-        lives: 5,
-        initialLives: 5,
+        lives: 7,
+        initialLives: 7,
         canSubmit: false,
         hasSubmittedOnce: false,
         allShapesPlaced: false,
@@ -91,7 +114,8 @@ function gameReducer(state, action) {
         eUsedThisLevel: state.runModifiers.basketPowerUsed,
         trajectoryExtended: state.runModifiers.trajectoryPowerUsed,
         basketWidened: state.runModifiers.basketPowerUsed,
-        tutorialActive: action.level === 4,
+        tutorialActive: action.tutorialType !== null,
+        tutorialType: action.tutorialType,
         selectRemoveTargetMode: false,
         activePowerupPopover: null,
       };
@@ -140,7 +164,18 @@ function gameReducer(state, action) {
       return { ...state, selectedShapeIndex: -1 };
 
     case 'DISMISS_TUTORIAL':
-      return { ...state, tutorialActive: false };
+      // Save completed tutorial to localStorage
+      if (state.tutorialType) {
+        markTutorialComplete(state.tutorialType);
+      }
+      return { ...state, tutorialActive: false, tutorialType: null };
+
+    case 'RETURN_TO_MENU':
+      return {
+        ...state,
+        screen: 'welcome',
+        gameState: 'edit',
+      };
 
     case 'OPEN_POWERUP_POPOVER':
       return { ...state, activePowerupPopover: action.powerupType };
@@ -263,6 +298,9 @@ export function GameProvider({ children }) {
     cachedTrajectory: null,
     trajectoryValid: false,
 
+    // Belt flash effect (orange trajectory flash after belt hit)
+    beltFlashTimer: 0,
+
     // Tutorial animation
     tutorialOpenTime: 0,
   });
@@ -282,6 +320,7 @@ export function GameProvider({ children }) {
     go.basketOriginalRadius = null;
     go.cachedTrajectory = null;
     go.trajectoryValid = false;
+    go.beltFlashTimer = 0;
 
     const w = canvasWidth;
     const h = canvasHeight;
@@ -376,17 +415,19 @@ export function GameProvider({ children }) {
 
     // Evenly distribute shapes across the available width
     // Gap = (available space - total shape width) / (numShapes - 1)
+    const MAX_GAP = 40; // Maximum gap to keep shapes from spreading too far
     let gap;
     if (numShapes <= 1) {
       gap = 0;
     } else {
       gap = (availableWidth - totalShapeWidth) / (numShapes - 1);
-      // Ensure minimum gap
-      gap = Math.max(MIN_GAP, gap);
+      // Ensure minimum and maximum gap
+      gap = Math.max(MIN_GAP, Math.min(MAX_GAP, gap));
     }
 
-    // Start from left edge (shapes will fill the width evenly)
-    const startX = boxLeft;
+    // Calculate total layout width and center it
+    const totalLayoutWidth = totalShapeWidth + gap * (numShapes - 1);
+    const startX = boxLeft + (availableWidth - totalLayoutWidth) / 2;
 
     go.shapes = [];
     let currentX = startX;
@@ -434,11 +475,45 @@ export function GameProvider({ children }) {
       }
     }
 
+    // Place obstacles from CSV config
+    if (csvConfig && csvConfig.obstacles && csvConfig.obstacles.length > 0) {
+      for (const obstacle of csvConfig.obstacles) {
+        if (obstacle.id === 13) {
+          // Pinball Bouncer (Flipper)
+          const flipper = new PinballBouncer(obstacle.x, obstacle.y, obstacle.direction || 'right', 0);
+          go.shapes.push(flipper);
+        }
+        // Add more obstacle types here as needed
+      }
+    }
+
+    // Determine tutorial type from CSV config
+    const completedTutorials = getCompletedTutorials();
+    let tutorialType = null;
+
+    if (csvConfig && csvConfig.tutorial) {
+      const tutorialMap = {
+        'one_way': TutorialType.ONE_WAY,
+        'conveyor_belt': TutorialType.CONVEYOR_BELT,
+        'pinball_bouncer': TutorialType.PINBALL_BOUNCER,
+      };
+      const mappedTutorial = tutorialMap[csvConfig.tutorial];
+      if (mappedTutorial && !completedTutorials.includes(mappedTutorial)) {
+        tutorialType = mappedTutorial;
+      }
+    }
+
+    // Initialize tutorial animation time
+    if (tutorialType) {
+      go.tutorialOpenTime = 0;
+    }
+
     dispatch({
       type: 'SETUP_LEVEL',
       level: levelNum,
       gravity,
       rebound,
+      tutorialType,
     });
   }, [state]);
 

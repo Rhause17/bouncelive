@@ -1,7 +1,7 @@
 import { ShapeTypeEnum } from './constants.js';
 import {
   Triangle, LineSegment, HalfCircle, Diamond, Octagon,
-  Trapezoid, Arrowhead, Boomerang, HalfPipe, SawtoothRamp,
+  Trapezoid, Arrowhead, Boomerang, HalfPipe, SawtoothRamp, ConveyorBelt, PinballBouncer,
 } from './shapes/index.js';
 
 /**
@@ -36,6 +36,10 @@ export function createShape(shapeType, x, y, colorIndex = 0) {
       return new HalfPipe(x, y, 75, 56, 12, colorIndex);
     case ShapeTypeEnum.SAWTOOTH_RAMP:
       return new SawtoothRamp(x, y, 70, 50, 6, colorIndex);
+    case ShapeTypeEnum.CONVEYOR_BELT:
+      return new ConveyorBelt(x, y, 158, 40, colorIndex);  // 105 * 1.5 = 157.5 → 158
+    case ShapeTypeEnum.PINBALL_BOUNCER:
+      return new PinballBouncer(x, y, 'right', colorIndex);
     default:
       throw new Error(`Unknown shape type: ${shapeType}`);
   }

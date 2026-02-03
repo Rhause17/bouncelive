@@ -116,25 +116,49 @@ export default function WinOverlay() {
 
   // Win overlay
   if (isWin) {
+    const isGameComplete = state.level === 20;
+
     return (
       <div className="game-overlay active win">
         <div className={`overlay-content ${showContent ? 'animate-in' : ''}`}>
-          <h2 className="overlay-text">SUCCESS!</h2>
-          <p className="level-complete-text">Level <span className="level-number">{displayedLevel}</span> Complete</p>
-          <div className="stars">
-            {[1, 2, 3].map(i => (
-              <span
-                key={i}
-                className={`star ${i <= visibleStars ? 'filled pop-in' : ''}`}
-                style={{ animationDelay: `${i * 0.1}s` }}
-              >
-                {'\u2605'}
-              </span>
-            ))}
-          </div>
-          <button className="next-level-btn" onClick={handleNextLevel}>
-            Next Level
-          </button>
+          {isGameComplete ? (
+            <>
+              <h2 className="overlay-text game-complete">You've completed the game!</h2>
+              <div className="stars">
+                {[1, 2, 3].map(i => (
+                  <span
+                    key={i}
+                    className={`star ${i <= visibleStars ? 'filled pop-in' : ''}`}
+                    style={{ animationDelay: `${i * 0.1}s` }}
+                  >
+                    {'\u2605'}
+                  </span>
+                ))}
+              </div>
+              <button className="next-level-btn wow-btn" onClick={handleReturnToMenu}>
+                WoW!
+              </button>
+            </>
+          ) : (
+            <>
+              <h2 className="overlay-text">SUCCESS!</h2>
+              <p className="level-complete-text">Level <span className="level-number">{displayedLevel}</span> Complete</p>
+              <div className="stars">
+                {[1, 2, 3].map(i => (
+                  <span
+                    key={i}
+                    className={`star ${i <= visibleStars ? 'filled pop-in' : ''}`}
+                    style={{ animationDelay: `${i * 0.1}s` }}
+                  >
+                    {'\u2605'}
+                  </span>
+                ))}
+              </div>
+              <button className="next-level-btn" onClick={handleNextLevel}>
+                Next Level
+              </button>
+            </>
+          )}
         </div>
       </div>
     );

@@ -10,3 +10,5 @@ export { Arrowhead } from './Arrowhead.js';
 export { Boomerang } from './Boomerang.js';
 export { HalfPipe } from './HalfPipe.js';
 export { SawtoothRamp } from './SawtoothRamp.js';
+export { ConveyorBelt } from './ConveyorBelt.js';
+export { PinballBouncer } from './PinballBouncer.js';

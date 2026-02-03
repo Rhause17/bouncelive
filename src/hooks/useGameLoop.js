@@ -81,6 +81,11 @@ export function useGameLoop({ gameObjects, state, dispatch, onDraw }) {
     // Update shapes
     go.shapes.forEach(s => s.update(dt));
 
+    // Update belt flash timer (decays over 400ms)
+    if (go.beltFlashTimer > 0) {
+      go.beltFlashTimer = Math.max(0, go.beltFlashTimer - dt);
+    }
+
     // Update basket animation
     if (go.basket) {
       go.basket.update(dt);
@@ -170,6 +175,11 @@ export function useGameLoop({ gameObjects, state, dispatch, onDraw }) {
             go.ball.startVanish(event.x, event.y);
             go.vfx.spawnCollisionParticles(event.x, event.y, 0, -1, 200, THEME);
             continue;
+          }
+
+          // Trigger trajectory flash on belt hit
+          if (event.isBeltHit) {
+            go.beltFlashTimer = 0.4; // 400ms flash duration
           }
 
           go.vfx.spawnCollisionParticles(

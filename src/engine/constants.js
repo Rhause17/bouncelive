@@ -4,6 +4,17 @@
 
 export const SIZE_SCALE = 0.65;
 
+// ========================================
+// TUTORIAL TYPES
+// ========================================
+
+export const TutorialType = {
+  NONE: null,
+  ONE_WAY: 'one_way',
+  CONVEYOR_BELT: 'conveyor_belt',
+  PINBALL_BOUNCER: 'pinball_bouncer',
+};
+
 export const ShapeTypeEnum = {
   TRIANGLE_LEFT: 'triangle_left',
   TRIANGLE_RIGHT: 'triangle_right',
@@ -16,6 +27,8 @@ export const ShapeTypeEnum = {
   BOOMERANG: 'boomerang',
   HALF_PIPE: 'half_pipe',
   SAWTOOTH_RAMP: 'sawtooth_ramp',
+  CONVEYOR_BELT: 'conveyor_belt',
+  PINBALL_BOUNCER: 'pinball_bouncer',
 };
 
 // Object ID to ShapeTypeEnum mapping (used by level data)
@@ -31,6 +44,8 @@ export const OBJECT_ID_MAP = {
   9: ShapeTypeEnum.BOOMERANG,
   10: ShapeTypeEnum.HALF_PIPE,
   11: ShapeTypeEnum.SAWTOOTH_RAMP,
+  12: ShapeTypeEnum.CONVEYOR_BELT,
+  13: ShapeTypeEnum.PINBALL_BOUNCER,
 };
 
 export const ONEWAY_ELIGIBLE = {
@@ -45,6 +60,8 @@ export const ONEWAY_ELIGIBLE = {
   9: true,
   10: true,
   11: true,
+  12: true,
+  13: false,  // Pinball Bouncer - not eligible for one-way
 };
 
 // Shape categories
@@ -63,7 +80,28 @@ export const ODD_SHAPES = [
   ShapeTypeEnum.BOOMERANG,
   ShapeTypeEnum.HALF_PIPE,
   ShapeTypeEnum.SAWTOOTH_RAMP,
+  ShapeTypeEnum.CONVEYOR_BELT,
 ];
+
+// ========================================
+// CONVEYOR BELT CONSTANTS
+// ========================================
+
+export const BELT_TANGENTIAL_STRENGTH = 950;  // px/s before SIZE_SCALE
+export const BELT_VERTICAL_DAMPING = 0.5;     // 50% energy loss in normal direction
+export const BELT_ARROW_SPEED = 35;           // Arrow animation px/s
+
+// ========================================
+// PINBALL BOUNCER (FLIPPER) CONSTANTS
+// ========================================
+
+export const FLIPPER_REST_ANGLE = -30;        // degrees (tip below horizontal)
+export const FLIPPER_PEAK_ANGLE = 0;          // degrees (horizontal)
+export const FLIPPER_SWING_DURATION = 100;    // ms - snappy upswing
+export const FLIPPER_RETURN_DURATION = 200;   // ms - slower return for satisfying feel
+export const FLIPPER_BASE_IMPULSE = 400;      // px/s before SIZE_SCALE
+export const FLIPPER_MIN_MULTIPLIER = 0.2;    // force at pivot
+export const FLIPPER_MAX_MULTIPLIER = 1.0;    // force at tip
 
 // ========================================
 // PHYSICS PRESETS

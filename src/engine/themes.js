@@ -120,6 +120,7 @@ export const SKINS = {
     trajectoryTick: 'rgba(0, 245, 255, 0.6)',
     trajectoryImpact: '#FFFF00',
     trajectoryImpactGlow: 'rgba(255, 255, 0, 0.6)',
+    trajectoryBeltFlash: '#FF6B00',  // Orange flash after belt hit
 
     // Trail and particles
     trailColor: '#FFFF00',
