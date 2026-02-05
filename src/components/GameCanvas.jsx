@@ -1202,7 +1202,12 @@ const TUTORIAL_CONFIGS = {
     bodyLines: [
       {
         parts: [
-          { text: 'Ball will bounce from only ', color: 'textSecondary' },
+          { text: 'Ball will bounce from', color: 'textSecondary' },
+        ]
+      },
+      {
+        parts: [
+          { text: 'only ', color: 'textSecondary' },
           { text: 'this side', color: '#FF00AA', bold: true },
           { text: '.', color: 'textSecondary' },
         ]
