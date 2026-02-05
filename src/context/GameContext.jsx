@@ -353,7 +353,10 @@ export function GameProvider({ children }) {
     const halfWidth = w / 2;
     const safeMargin = L.ballSpawnMargin;
     let ballX;
-    if (ballOnLeft) {
+    if (levelNum === 8) {
+      // Level 8: fixed ball position - 120px from left
+      ballX = 120;
+    } else if (ballOnLeft) {
       ballX = safeMargin + rand() * (halfWidth - safeMargin * 2);
     } else {
       ballX = halfWidth + safeMargin + rand() * (halfWidth - safeMargin * 2);
@@ -365,7 +368,10 @@ export function GameProvider({ children }) {
     const basketRadius = 35 * SIZE_SCALE;
     const basketSafeMargin = L.ballSpawnMargin;
     let basketX;
-    if (ballOnLeft) {
+    if (levelNum === 8) {
+      // Level 8: fixed basket position - 60px from right edge
+      basketX = w - 60;
+    } else if (ballOnLeft) {
       basketX = halfWidth + basketSafeMargin + rand() * (halfWidth - basketSafeMargin * 2);
     } else {
       basketX = basketSafeMargin + rand() * (halfWidth - basketSafeMargin * 2);
@@ -475,33 +481,35 @@ export function GameProvider({ children }) {
       }
     }
 
-    // Place obstacles from CSV config (with responsive positioning)
+    // Place obstacles from CSV config
     if (csvConfig && csvConfig.obstacles && csvConfig.obstacles.length > 0) {
-      // Reference dimensions (legacy canvas size)
-      const REF_WIDTH = 320;
-      const REF_HEIGHT = 568;
-
-      // Calculate play area bounds
+      // Calculate play area bounds for y positioning
       const playAreaTop = go.ballUpperLimit;
       const playAreaBottom = go.pieceAreaY;
       const playAreaHeight = playAreaBottom - playAreaTop;
 
       for (const obstacle of csvConfig.obstacles) {
         if (obstacle.id === 13) {
-          // Pinball Bouncer (Flipper) - responsive positioning
-          // Convert x from reference width percentage
-          const xRatio = obstacle.x / REF_WIDTH;
-          const responsiveX = w * xRatio;
+          // Pinball Bouncer (Flipper)
+          let flipperX, flipperY;
 
-          // Convert y relative to play area
-          // Original y=320 on ref height 568, play area was roughly 135 to 390 (255px)
-          // So y=320 was about 72% down the play area
-          const refPlayTop = 135;
-          const refPlayHeight = 255;
-          const yRatio = (obstacle.y - refPlayTop) / refPlayHeight;
-          const responsiveY = playAreaTop + playAreaHeight * Math.min(0.85, Math.max(0.15, yRatio));
+          if (levelNum === 8) {
+            // Level 8: fixed position - 80px from left, 45% down play area
+            flipperX = 80;
+            flipperY = playAreaTop + playAreaHeight * 0.45;
+          } else {
+            // Other levels: responsive positioning from CSV
+            const REF_WIDTH = 320;
+            const xRatio = obstacle.x / REF_WIDTH;
+            flipperX = w * xRatio;
 
-          const flipper = new PinballBouncer(responsiveX, responsiveY, obstacle.direction || 'right', 0);
+            const refPlayTop = 135;
+            const refPlayHeight = 255;
+            const yRatio = (obstacle.y - refPlayTop) / refPlayHeight;
+            flipperY = playAreaTop + playAreaHeight * Math.min(0.85, Math.max(0.15, yRatio));
+          }
+
+          const flipper = new PinballBouncer(flipperX, flipperY, obstacle.direction || 'right', 0);
           go.shapes.push(flipper);
         }
         // Add more obstacle types here as needed
