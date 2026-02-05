@@ -746,15 +746,7 @@ body {
     transition: none !important;
   }
 
-  .star.filled {
-    animation: none !important;
-    text-shadow: 0 0 10px rgba(255, 255, 0, 0.6) !important;
-  }
-
-  .welcome-title {
-    filter: none !important;
-    animation: none !important;
-  }
+  /* Star and welcome-title animations kept enabled for better UX */
 
   .rules-box {
     box-shadow: none !important;
