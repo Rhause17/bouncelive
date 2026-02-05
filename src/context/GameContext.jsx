@@ -475,12 +475,33 @@ export function GameProvider({ children }) {
       }
     }
 
-    // Place obstacles from CSV config
+    // Place obstacles from CSV config (with responsive positioning)
     if (csvConfig && csvConfig.obstacles && csvConfig.obstacles.length > 0) {
+      // Reference dimensions (legacy canvas size)
+      const REF_WIDTH = 320;
+      const REF_HEIGHT = 568;
+
+      // Calculate play area bounds
+      const playAreaTop = go.ballUpperLimit;
+      const playAreaBottom = go.pieceAreaY;
+      const playAreaHeight = playAreaBottom - playAreaTop;
+
       for (const obstacle of csvConfig.obstacles) {
         if (obstacle.id === 13) {
-          // Pinball Bouncer (Flipper)
-          const flipper = new PinballBouncer(obstacle.x, obstacle.y, obstacle.direction || 'right', 0);
+          // Pinball Bouncer (Flipper) - responsive positioning
+          // Convert x from reference width percentage
+          const xRatio = obstacle.x / REF_WIDTH;
+          const responsiveX = w * xRatio;
+
+          // Convert y relative to play area
+          // Original y=320 on ref height 568, play area was roughly 135 to 390 (255px)
+          // So y=320 was about 72% down the play area
+          const refPlayTop = 135;
+          const refPlayHeight = 255;
+          const yRatio = (obstacle.y - refPlayTop) / refPlayHeight;
+          const responsiveY = playAreaTop + playAreaHeight * Math.min(0.85, Math.max(0.15, yRatio));
+
+          const flipper = new PinballBouncer(responsiveX, responsiveY, obstacle.direction || 'right', 0);
           go.shapes.push(flipper);
         }
         // Add more obstacle types here as needed
