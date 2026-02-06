@@ -15,6 +15,59 @@ export const TutorialType = {
   PINBALL_BOUNCER: 'pinball_bouncer',
 };
 
+// ========================================
+// LEVEL 1 TUTORIAL SYSTEM
+// ========================================
+
+export const Level1TutorialStep = {
+  PLACEMENT: 'level1_placement',
+  ROTATION: 'level1_rotation',
+  NEAR_MISS: 'level1_nearMiss',
+  MISSED_OBJECTS: 'level1_missedObjects',
+};
+
+export const TutorialState = {
+  HIDDEN: 'hidden',
+  FADING_IN: 'fading_in',
+  VISIBLE: 'visible',
+  FADING_OUT: 'fading_out',
+};
+
+export const TUTORIAL_CONFIG = {
+  FADE_IN_DURATION: 200,       // ms
+  FADE_OUT_DURATION: 150,      // ms
+  NEAR_MISS_THRESHOLD: 50,     // px
+  TINT_COLOR: 'rgba(0, 0, 0, 0.7)',
+  HIGHLIGHT_GLOW_COLOR: 'rgba(255, 255, 255, 0.3)',
+  HIGHLIGHT_GLOW_COLOR_RED: 'rgba(255, 100, 100, 0.4)',
+  HIGHLIGHT_PULSE_DURATION: 1000,  // ms
+  HIGHLIGHT_PADDING: 12,       // px
+  HIGHLIGHT_BORDER_RADIUS: 8,  // px
+  TEXT_BOX_BG: 'rgba(30, 35, 45, 0.95)',
+  TEXT_BOX_BORDER: 'rgba(255, 255, 255, 0.2)',
+  TEXT_BOX_RADIUS: 12,         // px
+  TEXT_BOX_MARGIN_BOTTOM: 120, // px from screen bottom
+};
+
+export const TUTORIAL_CONTENT = {
+  [Level1TutorialStep.PLACEMENT]: {
+    text: "Place objects to guide the ball into the basket",
+    subtext: "Tap anywhere to continue",
+  },
+  [Level1TutorialStep.ROTATION]: {
+    text: "You can rotate the objects by the handle",
+    subtext: "Tap anywhere to continue",
+  },
+  [Level1TutorialStep.NEAR_MISS]: {
+    text: "You can fine tune angles of the objects by swiping this button",
+    subtext: "Tap anywhere to continue",
+  },
+  [Level1TutorialStep.MISSED_OBJECTS]: {
+    text: "Ball must hit ALL objects to open the basket",
+    subtext: "Tap anywhere to continue",
+  },
+};
+
 export const ShapeTypeEnum = {
   TRIANGLE_LEFT: 'triangle_left',
   TRIANGLE_RIGHT: 'triangle_right',

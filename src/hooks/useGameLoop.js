@@ -12,7 +12,7 @@ const THEME = getTheme('arcadeDark');
  * Safari optimization: pauses the RAF loop when overlays are shown
  * to prevent GPU compositor stalls.
  */
-export function useGameLoop({ gameObjects, state, dispatch, onDraw }) {
+export function useGameLoop({ gameObjects, state, dispatch, onDraw, onFail, onReturnToEdit }) {
   const rafId = useRef(null);
   const lastTimeRef = useRef(0);
   const stateRef = useRef(state);
@@ -150,6 +150,9 @@ export function useGameLoop({ gameObjects, state, dispatch, onDraw }) {
           go.ball.update(dt, 0);
         }
         if (elapsed >= 1000 || go.ball.isVanishComplete()) {
+          // Analyze for tutorial before resetting
+          if (onFail) onFail();
+
           go.failQueued = false;
           go.failReason = null;
           go.failStartTime = 0;
@@ -161,10 +164,21 @@ export function useGameLoop({ gameObjects, state, dispatch, onDraw }) {
           go.basket.reset();
           go.vfx.reset();
           go.replaySwooshTime = ANIM.swooshDuration;
+          go.ballPath = []; // Clear ball path for next try
+
+          // Show queued tutorial
+          if (onReturnToEdit) onReturnToEdit();
         }
       } else {
         // Normal physics update
         go.physics.update(go.ball, go.shapes, dt, go.basket);
+
+        // Track ball path for near miss detection (sample every few frames)
+        if (go.ballPath.length === 0 ||
+            Math.abs(go.ball.x - go.ballPath[go.ballPath.length - 1].x) > 5 ||
+            Math.abs(go.ball.y - go.ballPath[go.ballPath.length - 1].y) > 5) {
+          go.ballPath.push({ x: go.ball.x, y: go.ball.y });
+        }
 
         // Process collision events for VFX
         for (const event of go.physics.collisionEvents) {
@@ -212,7 +226,10 @@ export function useGameLoop({ gameObjects, state, dispatch, onDraw }) {
             go.vfx.spawnConfetti(go.basket.x, go.basket.y, THEME);
             dispatch({ type: 'WIN' });
           } else if (go.ball.y > go.basketLineY + 200 || go.ball.restTimer > 2 || !go.ball.visible) {
-            // Fail - return to edit
+            // Fail - analyze for tutorial before resetting
+            if (onFail) onFail();
+
+            // Return to edit
             dispatch({ type: 'RETURN_TO_EDIT' });
             go.ball.reset(go.ballSpawnX, go.ballUpperLimit);
             go.ball.visible = true;
@@ -220,6 +237,10 @@ export function useGameLoop({ gameObjects, state, dispatch, onDraw }) {
             go.basket.reset();
             go.vfx.reset();
             go.replaySwooshTime = ANIM.swooshDuration;
+            go.ballPath = []; // Clear ball path for next try
+
+            // Show queued tutorial
+            if (onReturnToEdit) onReturnToEdit();
           }
         }
       }

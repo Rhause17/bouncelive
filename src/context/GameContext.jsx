@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useRef, useEffect } from 'react';
 import { Physics } from '../engine/physics.js';
 import { VFXManager } from '../engine/vfx.js';
 import { Ball } from '../engine/entities/Ball.js';
@@ -6,9 +6,11 @@ import { Basket } from '../engine/entities/Basket.js';
 import { createShape } from '../engine/shapeFactory.js';
 import { getLevelConfig } from '../data/levels.js';
 import { PinballBouncer } from '../engine/shapes/PinballBouncer.js';
+import { useTutorial } from './TutorialContext.jsx';
 import {
   SIZE_SCALE, LAYOUT, ANIM, OBJECT_ID_MAP, ONEWAY_ELIGIBLE,
   NORMAL_SHAPES, ODD_SHAPES, TutorialType, ShapeTypeEnum,
+  Level1TutorialStep, TUTORIAL_CONFIG,
 } from '../engine/constants.js';
 
 // ========================================
@@ -249,8 +251,27 @@ function gameReducer(state, action) {
 
 const GameContext = createContext(null);
 
+// Helper: Calculate closest distance from ball path to basket
+function getClosestDistanceToBasket(ballPath, basket) {
+  let minDistance = Infinity;
+
+  for (const point of ballPath) {
+    const dx = point.x - basket.x;
+    const dy = point.y - basket.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Only consider points that are roughly at basket's Y level or below
+    if (point.y >= basket.y - 50) {
+      minDistance = Math.min(minDistance, distance);
+    }
+  }
+
+  return minDistance;
+}
+
 export function GameProvider({ children }) {
   const [state, dispatch] = useReducer(gameReducer, initialState);
+  const tutorial = useTutorial();
 
   // Mutable game objects (not in React state - these mutate every frame)
   const gameObjects = useRef({
@@ -268,6 +289,11 @@ export function GameProvider({ children }) {
     pieceAreaWidth: 0,
     pieceAreaHeight: 0,
     levelSeed: null,
+
+    // Level 1 tutorial state
+    ballPath: [],                    // Track ball positions for near miss detection
+    level1TutorialTriggered: false,  // Has placement tutorial been shown this level?
+    rotationTutorialTriggered: false, // Has rotation tutorial been shown?
 
     // Fail queue
     failQueued: false,
@@ -288,7 +314,6 @@ export function GameProvider({ children }) {
     replaySwooshTime: 0,
     prevState: 'edit',
     removeModeAlpha: 0,
-    pieceHintAlpha: 1,
 
     // Basket widen animation
     basketOriginalRadius: null,
@@ -537,6 +562,11 @@ export function GameProvider({ children }) {
       go.tutorialOpenTime = 0;
     }
 
+    // Reset Level 1 tutorial state
+    go.level1TutorialTriggered = false;
+    go.rotationTutorialTriggered = false;
+    go.ballPath = [];
+
     dispatch({
       type: 'SETUP_LEVEL',
       level: levelNum,
@@ -544,7 +574,22 @@ export function GameProvider({ children }) {
       rebound,
       tutorialType,
     });
-  }, [state]);
+
+    // Trigger Level 1 placement tutorial
+    if (levelNum === 1 && tutorial.shouldShowTutorial(Level1TutorialStep.PLACEMENT)) {
+      // Delay slightly to ensure layout is ready
+      setTimeout(() => {
+        const highlights = [{
+          x: go.pieceAreaX,
+          y: go.pieceAreaY,
+          width: go.pieceAreaWidth,
+          height: go.pieceAreaHeight,
+        }];
+        tutorial.showTutorial(Level1TutorialStep.PLACEMENT, highlights);
+        go.level1TutorialTriggered = true;
+      }, 300);
+    }
+  }, [state, tutorial]);
 
   const submit = useCallback(() => {
     const go = gameObjects.current;
@@ -580,6 +625,103 @@ export function GameProvider({ children }) {
     gameObjects.current.trajectoryValid = false;
   }, []);
 
+  // Called when an object is moved - check for rotation tutorial trigger
+  const onObjectMoved = useCallback((movedShape) => {
+    const go = gameObjects.current;
+
+    // Dismiss placement tutorial if showing
+    if (tutorial.isStepShowing(Level1TutorialStep.PLACEMENT)) {
+      tutorial.dismissTutorial();
+    }
+
+    // Trigger rotation tutorial on first object move (Level 1 only)
+    if (state.level === 1 && !go.rotationTutorialTriggered) {
+      if (tutorial.shouldShowTutorial(Level1TutorialStep.ROTATION)) {
+        // Highlight the moved shape's rotation handle area
+        const box = movedShape.getBoundingBox();
+        const highlights = [{
+          x: movedShape.x - 20,
+          y: movedShape.y - box.height / 2 - 30,
+          width: 40,
+          height: 40,
+        }];
+        tutorial.showTutorial(Level1TutorialStep.ROTATION, highlights);
+        go.rotationTutorialTriggered = true;
+      }
+    }
+  }, [state.level, tutorial]);
+
+  // Called when an object is rotated
+  const onObjectRotated = useCallback(() => {
+    if (tutorial.isStepShowing(Level1TutorialStep.ROTATION)) {
+      tutorial.dismissTutorial();
+    }
+  }, [tutorial]);
+
+  // Analyze fail and queue appropriate tutorial (missed objects / near miss)
+  const analyzeFailForTutorial = useCallback(() => {
+    const go = gameObjects.current;
+    const shapes = go.shapes.filter(s => !s.removedByPowerup);
+    const totalShapes = shapes.length;
+    const hitShapes = shapes.filter(s => s.hasBeenHit).length;
+    const missedShapes = shapes.filter(s => !s.hasBeenHit);
+
+    // Check if some objects weren't hit
+    if (hitShapes < totalShapes) {
+      if (tutorial.shouldShowTutorial(Level1TutorialStep.MISSED_OBJECTS)) {
+        // Queue for next try with missed shape highlights
+        const missedIndices = missedShapes.map(s => go.shapes.indexOf(s));
+        tutorial.queueTutorialForNextTry(Level1TutorialStep.MISSED_OBJECTS, missedIndices);
+      }
+      return;
+    }
+
+    // All objects hit - check for near miss
+    if (go.ballPath.length > 0 && go.basket) {
+      const closestDist = getClosestDistanceToBasket(go.ballPath, go.basket);
+      if (closestDist < TUTORIAL_CONFIG.NEAR_MISS_THRESHOLD) {
+        if (tutorial.shouldShowTutorial(Level1TutorialStep.NEAR_MISS)) {
+          tutorial.queueTutorialForNextTry(Level1TutorialStep.NEAR_MISS);
+        }
+      }
+    }
+  }, [tutorial]);
+
+  // Show queued tutorial at start of next try
+  const showQueuedTutorialIfAny = useCallback(() => {
+    const go = gameObjects.current;
+
+    tutorial.showQueuedTutorial((stepId, missedIndices) => {
+      if (stepId === Level1TutorialStep.MISSED_OBJECTS && missedIndices.length > 0) {
+        // Highlight missed shapes (with red glow)
+        return missedIndices.map(idx => {
+          const shape = go.shapes[idx];
+          if (!shape) return null;
+          const box = shape.getBoundingBox();
+          return {
+            x: shape.x - box.width / 2,
+            y: shape.y - box.height / 2,
+            width: box.width,
+            height: box.height,
+            isRed: true,
+          };
+        }).filter(Boolean);
+      } else if (stepId === Level1TutorialStep.NEAR_MISS) {
+        // Highlight angle adjust box specifically
+        const L = LAYOUT;
+        const canvasWidth = go.pieceAreaX + go.pieceAreaWidth + L.pieceAreaMargin;
+        const angleBoxWidth = (canvasWidth - L.controlBoxMargin * 2 - L.controlBoxGap) / 2;
+        return [{
+          x: L.controlBoxMargin,
+          y: go.bottomControlsY + L.bottomControlsPadding,
+          width: angleBoxWidth,
+          height: L.controlBoxHeight,
+        }];
+      }
+      return [];
+    });
+  }, [tutorial]);
+
   const value = {
     state,
     dispatch,
@@ -589,6 +731,11 @@ export function GameProvider({ children }) {
     returnToEdit,
     nextLevel,
     invalidateTrajectory,
+    // Level 1 tutorial functions
+    onObjectMoved,
+    onObjectRotated,
+    analyzeFailForTutorial,
+    showQueuedTutorialIfAny,
   };
 
   return (

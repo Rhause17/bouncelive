@@ -11,7 +11,10 @@ const THEME = getTheme('arcadeDark');
 
 export default function GameCanvas() {
   const canvasRef = useRef(null);
-  const { state, dispatch, gameObjects, setupLevel, submit, nextLevel, invalidateTrajectory } = useGame();
+  const {
+    state, dispatch, gameObjects, setupLevel, submit, nextLevel, invalidateTrajectory,
+    onObjectMoved, onObjectRotated, analyzeFailForTutorial, showQueuedTutorialIfAny,
+  } = useGame();
   const { width, height } = useCanvasSize();
   const patternCanvasRef = useRef(null);
   const lastTapTimeRef = useRef(0); // For double-tap detection
@@ -219,24 +222,6 @@ export default function GameCanvas() {
       ctx.setLineDash([8, 6]);
       ctx.stroke();
       ctx.setLineDash([]);
-
-      // Hint text above piece area - only on level 1, fades when piece moved
-      if (state.level === 1 && go.pieceHintAlpha > 0) {
-        // Fade out when any piece has been moved
-        const anyMoved = go.shapes.some(s => s.hasBeenMoved);
-        if (anyMoved && go.pieceHintAlpha > 0) {
-          go.pieceHintAlpha = Math.max(0, go.pieceHintAlpha - 0.05);
-        }
-
-        ctx.save();
-        ctx.globalAlpha = go.pieceHintAlpha;
-        ctx.font = `700 ${L.controlBoxFontSize * 0.85}px Nunito, sans-serif`;
-        ctx.fillStyle = T.textSecondary;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('Place objects to submit', w / 2, go.pieceAreaY - 10);
-        ctx.restore();
-      }
     }
 
     // ===== BASKET LINE =====
@@ -392,6 +377,8 @@ export default function GameCanvas() {
     state,
     dispatch,
     onDraw: draw,
+    onFail: analyzeFailForTutorial,
+    onReturnToEdit: showQueuedTutorialIfAny,
   });
 
   // ========================================
@@ -664,8 +651,21 @@ export default function GameCanvas() {
         // Invalid position - snap back to drag start
         shape.returnToDragStart();
         // TODO: Add shake animation for visual feedback
+      } else {
+        // Valid move - notify for tutorial tracking
+        onObjectMoved(shape);
       }
       updateCanSubmit(go, dispatch, state);
+    }
+
+    // Notify rotation for tutorial tracking
+    if (ds.isRotating && ds.shapeIndex >= 0) {
+      onObjectRotated();
+    }
+
+    // Notify angle swipe rotation for tutorial tracking
+    if (ds.isSwipingAngle && state.selectedShapeIndex >= 0) {
+      onObjectRotated();
     }
 
     dragState.current = {
@@ -678,7 +678,7 @@ export default function GameCanvas() {
       swipeStartX: 0,
       angleAtSwipeStart: 0,
     };
-  }, [gameObjects, dispatch, state]);
+  }, [gameObjects, dispatch, state, onObjectMoved, onObjectRotated]);
 
   // ========================================
   // RENDER
